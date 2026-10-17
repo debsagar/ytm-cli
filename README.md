@@ -23,7 +23,7 @@ Under the hood it is a single audio-only [mpv](https://mpv.io) process fed by [y
 2. Clone this repo somewhere permanent:
 
    ```powershell
-   git clone https://github.com/<your-user>/ytm.git C:\Tools\ytm
+   git clone https://github.com/debsagar/ytm-cli.git C:\Tools\ytm
    ```
 
 3. Make `ytm` available from any terminal. Either add the clone folder to your `PATH`, or create a one-line forwarder in a folder that is already on it:
