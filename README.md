@@ -1,8 +1,10 @@
-# ytm
+﻿# ytm
 
 A minimal-RAM YouTube Music player for the Windows terminal. Search, queue, start radio mixes and replay your history from a small mini-player window: no browser, no login.
 
 Under the hood it is a single audio-only [mpv](https://mpv.io) process fed by [yt-dlp](https://github.com/yt-dlp/yt-dlp), controlled by a small [Textual](https://textual.textualize.io) app. Together they use about 100 MB of RAM.
+
+![ytm mini-player](docs/screenshot.png)
 
 ## Requirements
 
@@ -51,10 +53,10 @@ ytm finds mpv in `C:\Program Files\MPV Player`, a `bin` folder inside the repo, 
 
 `ytm` with no arguments opens the player in its own small Windows Terminal window (`ytm here` opens it in the current terminal).
 
-- Type a song name and press Enter to search; pick a result with ↑/↓ and Enter.
+- Type a song name and press Enter to search; pick a result with â†‘/â†“ and Enter.
 - `play <song>`, `queue <song>`, `radio <song>`, `skip`, `prev`, `pause`, `vol 40`, `remove 3`, `clear`, `quit`
-- Tab moves into the list: Enter plays, `a` adds to the queue, `d` removes from it, ←/→ switch between queue, history and results. Esc goes back to the prompt.
-- Ctrl+Space pause · Ctrl+N next · Ctrl+B previous · Ctrl+←/→ seek
+- Tab moves into the list: Enter plays, `a` adds to the queue, `d` removes from it, â†/â†’ switch between queue, history and results. Esc goes back to the prompt.
+- Ctrl+Space pause Â· Ctrl+N next Â· Ctrl+B previous Â· Ctrl+â†/â†’ seek
 - Type `?` for the full help.
 
 ## Classic commands
@@ -91,8 +93,8 @@ Include the artist in searches ("daft punk around the world"); search results on
 | `+` / `0` | Volume up |
 | `-` / `9` | Volume down |
 | `m` | Mute |
-| `→` / `←` | Seek 5 s |
-| `↑` / `↓` | Seek 1 min |
+| `â†’` / `â†` | Seek 5 s |
+| `â†‘` / `â†“` | Seek 1 min |
 | `s` | Toggle shuffle |
 
 ## History
