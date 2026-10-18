@@ -3,6 +3,14 @@ rem ytm - minimal-RAM YouTube Music player (see ytm.ps1 for the logic).
 rem PowerShell only resolves what to play and exits; this shim then starts
 rem mpv, so the only things left in memory are mpv and a tiny cmd.exe.
 setlocal DisableDelayedExpansion
+
+rem No arguments: open the full-screen app (Python, ytm\app.py).
+if "%~1"=="" (
+    pushd "%~dp0"
+    "%USERPROFILE%\.venvs\ytm\Scripts\python.exe" -m ytm
+    popd
+    exit /b
+)
 set "YTM_OUT=%TEMP%\ytm-%RANDOM%-%RANDOM%.txt"
 set "YTM_MPV="
 set "YTM_TARGET="
