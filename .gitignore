@@ -1,3 +1,4 @@
 mpv/history.tsv
 bin/
 __pycache__/
+data/

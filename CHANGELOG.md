@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here. Versions follow [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- Album art drawn in the terminal with half-block characters.
+- Clickable buttons: playback controls, like, volume, autoplay, and actions for the selected song.
+- Liked songs (`like`, ♥ button, **liked** tab).
+- Playlists: add any song (≡ button or `s`), `save <name>` saves the queue, **playlists** tab to open, play, queue or delete them.
+- Add to queue from history, liked songs and playlists.
+
 ## [0.3.0] - 2026-10-18
 
 ### Added
