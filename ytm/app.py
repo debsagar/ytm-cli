@@ -1,24 +1,31 @@
-"""The terminal UI (Textual): a compact mini-player card. Run with:  python -m ytm"""
+"""The terminal UI (Textual): a compact mini-player. Run with:  python -m ytm"""
 
+import os
 import re
 
-from textual import on, work
-from textual.app import App, ComposeResult
-from textual.binding import Binding
-from textual.containers import Vertical
-from textual.markup import escape
-from textual.widgets import Input, Label, ListItem, ListView, Static
+# Windows Terminal supports 24-bit colour but doesn't always advertise it,
+# which makes Textual fall back to grey. Say so before Textual starts.
+os.environ.setdefault("COLORTERM", "truecolor")
 
-from . import library, search
-from .player import Player
-from .search import Track
+from textual import on, work  # noqa: E402
+from textual.app import App, ComposeResult  # noqa: E402
+from textual.binding import Binding  # noqa: E402
+from textual.containers import Vertical  # noqa: E402
+from textual.markup import escape  # noqa: E402
+from textual.screen import ModalScreen  # noqa: E402
+from textual.widgets import Input, Label, ListItem, ListView, Static  # noqa: E402
 
-HELP = (
-    "[b]play[/] <song|url>   [b]queue[/] <song>   [b]radio[/] <song>   or just type to search\n"
-    "[b]skip  prev  pause  vol[/] <n>   [b]remove[/] <n>   [b]clear[/]   [b]quit[/]\n"
-    "[dim]tab → list (enter play · a add · d remove · ←/→ switch view)   esc → prompt\n"
-    "ctrl+space pause · ctrl+n next · ctrl+b prev · ctrl+←/→ seek[/]"
+from . import library, search  # noqa: E402
+from .player import Player  # noqa: E402
+from .search import Track  # noqa: E402
+
+# Catppuccin Mocha palette, used directly so colours never depend on the terminal theme.
+C = dict(
+    crust="#11111b", mantle="#181825", base="#1e1e2e", s0="#313244", s1="#45475a",
+    dim="#6c7086", sub="#a6adc8", text="#cdd6f4",
+    mauve="#cba6f7", pink="#f5c2e7", blue="#89b4fa", green="#a6e3a1", peach="#fab387",
 )
+
 URL_RE = re.compile(r"^(https?://)?((www|music|m)\.)?youtu(be\.com|\.be)/", re.I)
 VID_RE = re.compile(r"(?:v=|youtu\.be/)([\w-]{11})")
 # Noise YouTube adds to titles: "(Official Music Video)", "[Lyrics]", "| Lyrics" ...
@@ -27,6 +34,26 @@ NOISE_RE = re.compile(
     re.I,
 )
 VIEWS = ["queue", "history", "results"]
+
+HELP_ROWS = [
+    ("Type anything", "search YouTube Music"),
+    ("play <song>", "play the top result now"),
+    ("queue <song>", "add the top result to the queue"),
+    ("radio <song>", "start a 50-song mix"),
+    ("skip · prev · pause", "playback"),
+    ("vol 40", "set volume (0-100)"),
+    ("remove 3 · clear", "edit the queue"),
+    ("queue · history", "switch the list"),
+    ("quit", "exit (Ctrl+Q also works)"),
+    ("", ""),
+    ("Tab / Esc", "move between list and prompt"),
+    ("Enter", "play the selected song"),
+    ("a / d", "add to queue / remove from queue"),
+    ("← →", "switch list tabs"),
+    ("Ctrl+Space", "pause"),
+    ("Ctrl+N / Ctrl+B", "next / previous song"),
+    ("Ctrl+← / Ctrl+→", "seek 10 s"),
+]
 
 
 def fmt_time(s):
@@ -54,37 +81,67 @@ def track_parts(t: Track):
     return split_label(t.title)
 
 
+def keys(*pairs):
+    """Footer hint: coloured key, grey description."""
+    return "   ".join(f"[b {C['blue']}]{k}[/] [{C['dim']}]{d}[/]" for k, d in pairs)
+
+
 class Row(ListItem):
-    def __init__(self, track: Track, num: int, current=False, duration=""):
+    def __init__(self, track: Track, num: int, current=False):
         title, artist = (escape(x) for x in track_parts(track))
-        lead = "[b $accent]▶ [/]" if current else f"[dim]{num:>2}[/] "
-        name = f"[b]{title}[/]" if current else title
-        super().__init__(Label(lead + name + (f"  [dim]{artist}[/]" if artist else "")))
+        if current:
+            text = f"[b {C['green']}]▶  {title}[/]"
+        else:
+            text = f"[{C['dim']}]{num:>2}[/] {title}"
+        if artist:
+            text += f"  [{C['dim']}]{artist}[/]"
+        super().__init__(Label(text))
         self.track = track
-        self.duration = duration
+
+
+class HelpScreen(ModalScreen):
+    BINDINGS = [Binding("escape,question_mark,q,enter", "dismiss")]
+    CSS = f"""
+    HelpScreen {{ align: center middle; background: {C['crust']} 70%; }}
+    #help {{ width: 60; height: auto; background: {C['mantle']}; border: round {C['mauve']};
+             padding: 1 2; border-title-color: {C['mauve']}; }}
+    """
+
+    def compose(self):
+        lines = []
+        for k, d in HELP_ROWS:
+            lines.append(f"[b {C['blue']}]{k:<20}[/][{C['sub']}]{d}[/]" if k else "")
+        w = Static("\n".join(lines) + f"\n\n[{C['dim']}]press Esc to close[/]", id="help")
+        w.border_title = "how to use ytm"
+        yield w
 
 
 class YtmApp(App):
     TITLE = "ytm"
     ENABLE_COMMAND_PALETTE = False
-    CSS = """
-    Screen { align: center middle; background: $background; }
-    #card {
-        width: 100%; max-width: 84; height: 100%; max-height: 26;
-        border: round $primary 50%; padding: 0 1;
-    }
-    #title { text-style: bold; height: 1; color: $accent; }
-    #title, #artist, #list Label { text-wrap: nowrap; text-overflow: ellipsis; }
-    #artist { color: $text-muted; height: 1; }
-    #bar { height: 1; margin-top: 1; }
-    #tabs { height: 1; margin-top: 1; color: $text-muted; }
-    #list { height: 1fr; background: transparent; scrollbar-size-vertical: 1; }
-    #list > ListItem { background: transparent; }
-    #list > ListItem.-highlight { background: $primary 20%; }
-    #list:focus > ListItem.-highlight { background: $primary 35%; }
-    #msg { height: auto; max-height: 4; color: $text-muted; }
-    #prompt { border: none; background: transparent; padding: 0; height: 1; margin-top: 1; }
-    #prompt:focus { border: none; }
+    CSS = f"""
+    Screen {{ background: {C['base']}; color: {C['text']}; }}
+
+    #now {{ height: auto; background: {C['mantle']}; padding: 1 2; }}
+    #title {{ color: {C['pink']}; text-style: bold; }}
+    #artist {{ color: {C['sub']}; }}
+    #bar {{ margin-top: 1; }}
+    #title, #artist, #list Label {{ text-wrap: nowrap; text-overflow: ellipsis; }}
+
+    #tabs {{ height: 1; padding: 0 1; margin-top: 1; }}
+    #list {{ height: 1fr; background: {C['base']}; padding: 0 1;
+             scrollbar-size-vertical: 1; scrollbar-color: {C['s1']}; scrollbar-background: {C['base']}; }}
+    #list > ListItem {{ background: {C['base']}; }}
+    #list > ListItem.-highlight {{ background: {C['base']}; }}
+    #list:focus > ListItem.-highlight {{ background: {C['s0']}; }}
+
+    #msg {{ height: 1; padding: 0 2; color: {C['peach']}; }}
+    #prompt {{ height: 3; margin: 0 1; background: {C['mantle']}; color: {C['text']};
+               border: round {C['s1']}; padding: 0 1; }}
+    #prompt:focus {{ border: round {C['mauve']}; }}
+    #prompt > .input--placeholder {{ color: {C['dim']}; }}
+    #prompt > .input--cursor {{ background: {C['mauve']}; color: {C['crust']}; }}
+    #footer {{ height: 1; padding: 0 2; background: {C['crust']}; }}
     """
     BINDINGS = [
         Binding("ctrl+space", "pause", priority=True),
@@ -97,12 +154,12 @@ class YtmApp(App):
         Binding("right", "view(1)"),
         Binding("a", "add_selected"),
         Binding("delete,d", "remove_selected"),
+        Binding("question_mark", "help"),
         Binding("ctrl+c,ctrl+q", "quit", priority=True),
     ]
 
     def __init__(self):
         super().__init__()
-        self.theme = "catppuccin-mocha"
         self.state = {"media-title": None, "time-pos": None, "duration": None,
                       "pause": False, "volume": 70, "playlist-pos": -1}
         self.known = {}  # video id -> Track, so the queue can show proper titles
@@ -111,14 +168,15 @@ class YtmApp(App):
         self._last_sec = None
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="card"):
+        with Vertical(id="now"):
             yield Static(id="title")
             yield Static(id="artist")
             yield Static(id="bar")
-            yield Static(id="tabs")
-            yield ListView(id="list")
-            yield Static(id="msg")
-            yield Input(placeholder="search or command · ? for help", id="prompt")
+        yield Static(id="tabs")
+        yield ListView(id="list")
+        yield Static(id="msg")
+        yield Input(placeholder="search a song, or type ? for help", id="prompt")
+        yield Static(id="footer")
 
     def on_mount(self):
         self.player = Player(on_change=self._from_mpv)
@@ -132,6 +190,9 @@ class YtmApp(App):
 
     def on_resize(self):
         self.render_now()
+
+    def on_descendant_focus(self):
+        self.render_footer()
 
     # ---- mpv events (arrive on a background thread) ----
     def _from_mpv(self, name, value):
@@ -154,8 +215,10 @@ class YtmApp(App):
     # ---- drawing ----
     def current_track(self):
         pos = self.state["playlist-pos"]
-        entries = self.player.playlist() if pos is not None and pos >= 0 else []
-        if 0 <= (pos or 0) < len(entries):
+        if pos is None or pos < 0:
+            return None
+        entries = self.player.playlist()
+        if pos < len(entries):
             m = VID_RE.search(entries[pos].get("filename", ""))
             if m and m.group(1) in self.known:
                 return self.known[m.group(1)]
@@ -169,17 +232,17 @@ class YtmApp(App):
         elif s["media-title"]:
             title, artist = split_label(s["media-title"])
         else:
-            title, artist = "Nothing playing", "type a song below to start"
-        icon = "⏸ " if s["pause"] else ""
+            title, artist = "Nothing playing", "search for a song below to start"
+        icon = "⏸  " if s["pause"] else "♪  "
         self.query_one("#title").update(icon + escape(title))
-        self.query_one("#artist").update(escape(artist))
+        self.query_one("#artist").update("   " + escape(artist))
 
         pos, dur = s["time-pos"], s["duration"]
-        right = f"  {fmt_time(pos)} / {fmt_time(dur)}  vol {int(s['volume'] or 0)}"
-        width = max(10, self.query_one("#card").content_size.width - len(right))
+        right = f"  {fmt_time(pos)} / {fmt_time(dur)}   vol {int(s['volume'] or 0)}%"
+        width = max(10, self.query_one("#now").content_size.width - len(right))
         filled = int(width * pos / dur) if pos and dur else 0
         self.query_one("#bar").update(
-            f"[$accent]{'━' * filled}[/][$panel-lighten-2]{'━' * (width - filled)}[/][dim]{right}[/]"
+            f"[{C['mauve']}]{'━' * filled}[/][{C['s1']}]{'━' * (width - filled)}[/][{C['sub']}]{right}[/]"
         )
 
     def render_tabs(self):
@@ -187,8 +250,18 @@ class YtmApp(App):
         for v in VIEWS:
             if v == "results" and not self.results:
                 continue
-            parts.append(f"[b $background on $accent] {v} [/]" if v == self.view else f"[dim] {v} [/]")
+            if v == self.view:
+                parts.append(f"[b {C['crust']} on {C['mauve']}] {v} [/]")
+            else:
+                parts.append(f"[{C['dim']}] {v} [/]")
         self.query_one("#tabs").update(" ".join(parts))
+
+    def render_footer(self):
+        if self.focused is self.query_one("#list"):
+            hint = keys(("enter", "play"), ("a", "queue"), ("d", "remove"), ("←→", "tabs"), ("esc", "back"))
+        else:
+            hint = keys(("enter", "search"), ("tab", "list"), ("^space", "pause"), ("^n", "next"), ("?", "help"))
+        self.query_one("#footer").update(hint)
 
     def fill_list(self):
         lv = self.query_one("#list", ListView)
@@ -233,11 +306,11 @@ class YtmApp(App):
     @work(thread=True, exclusive=True)
     def do_search(self, query, action):
         """Network lookups run on a worker thread so the UI never freezes."""
-        self.call_from_thread(self.say, f"[dim]searching {query} …[/]")
+        self.call_from_thread(self.say, f"searching {escape(query)} …")
         try:
             results = search.search(query)
             if not results:
-                self.call_from_thread(self.say, f"no results for {query}")
+                self.call_from_thread(self.say, f"no results for {escape(query)}")
                 return
             top = results[0]
             if action == "search":
@@ -249,12 +322,13 @@ class YtmApp(App):
                 tracks = search.radio(top.video_id) or [top]
                 self.call_from_thread(self.play_tracks, tracks, True)
                 self.call_from_thread(self.show, "queue")
-                self.call_from_thread(self.say, f"[dim]radio · {len(tracks)} tracks[/]")
+                self.call_from_thread(self.say, f"radio · {len(tracks)} songs queued")
             else:
                 self.call_from_thread(self.play_tracks, [top], action == "play")
-                self.call_from_thread(self.say, f"[dim]{'playing' if action == 'play' else 'queued'} {top.label}[/]")
+                verb = "playing" if action == "play" else "queued"
+                self.call_from_thread(self.say, f"{verb} · {escape(top.label)}")
         except Exception as e:  # network errors etc. should not kill the app
-            self.call_from_thread(self.say, f"[red]{e}[/]")
+            self.call_from_thread(self.say, f"[{C['pink']}]error: {escape(str(e))}[/]")
 
     # ---- the prompt ----
     @on(Input.Submitted, "#prompt")
@@ -294,15 +368,15 @@ class YtmApp(App):
             elif cmd in ("quit", "exit"):
                 self.exit()
             elif cmd in ("help", "?"):
-                self.say(HELP)
+                self.action_help()
             elif URL_RE.match(line):
                 p.play(line if line.startswith("http") else "https://" + line)
             else:
                 self.do_search(line, "search")  # plain text = search
         except (ValueError, IndexError):
-            self.say(f"bad argument for {cmd}")
+            self.say(f"didn't understand '{escape(line)}' · type ? for help")
         except RuntimeError as e:
-            self.say(f"[red]{e}[/]")
+            self.say(escape(str(e)))
 
     # ---- list interaction ----
     @on(ListView.Selected)
@@ -322,7 +396,7 @@ class YtmApp(App):
         row = self._selected()
         if row and self.view != "queue":
             self.play_tracks([row.track], False)
-            self.say(f"[dim]queued {row.track.label}[/]")
+            self.say(f"queued · {escape(row.track.label)}")
 
     def action_remove_selected(self):
         row = self._selected()
@@ -335,6 +409,10 @@ class YtmApp(App):
             return
         views = [v for v in VIEWS if v != "results" or self.results]
         self.show(views[(views.index(self.view) + step) % len(views)])
+
+    def action_help(self):
+        if not isinstance(self.screen, HelpScreen):
+            self.push_screen(HelpScreen())
 
     # ---- hotkeys ----
     def action_pause(self):
