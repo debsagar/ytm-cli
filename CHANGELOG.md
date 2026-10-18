@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. Versions follow [Semantic Versioning](https://semver.org).
 
-## [Unreleased]
+## [0.3.0] - 2026-10-18
 
 ### Added
 - Autoplay (on by default): when the queue is almost done, 10 similar songs are added automatically. Toggle with `auto`.
@@ -25,5 +25,6 @@ All notable changes to this project are documented here. Versions follow [Semant
 - Play history (`ytm history`), logged by an mpv Lua script.
 - Minimal-RAM setup: audio-only mpv with a small cache; PowerShell exits before playback.
 
+[0.3.0]: https://github.com/debsagar/ytm-cli/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/debsagar/ytm-cli/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/debsagar/ytm-cli/releases/tag/v0.1.0
