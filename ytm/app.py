@@ -44,6 +44,7 @@ HELP_ROWS = [
     ("vol 40", "set volume (0-100)"),
     ("remove 3 · clear", "edit the queue"),
     ("queue · history", "switch the list"),
+    ("auto", "toggle autoplay: keep adding similar songs"),
     ("quit", "exit (Ctrl+Q also works)"),
     ("", ""),
     ("Tab / Esc", "move between list and prompt"),
@@ -166,6 +167,8 @@ class YtmApp(App):
         self.results = []
         self.view = "history"
         self._last_sec = None
+        self.auto = True         # autoplay: top up the queue with similar songs
+        self._filling = False
 
     def compose(self) -> ComposeResult:
         with Vertical(id="now"):
@@ -208,8 +211,10 @@ class YtmApp(App):
 
     def _apply(self, name, value):
         self.state[name] = value
-        if name in ("playlist-pos", "playlist-count") and self.view == "queue":
-            self.fill_list()
+        if name in ("playlist-pos", "playlist-count"):
+            if self.view == "queue":
+                self.fill_list()
+            self.maybe_autofill()
         self.render_now()
 
     # ---- drawing ----
@@ -254,7 +259,8 @@ class YtmApp(App):
                 parts.append(f"[b {C['crust']} on {C['mauve']}] {v} [/]")
             else:
                 parts.append(f"[{C['dim']}] {v} [/]")
-        self.query_one("#tabs").update(" ".join(parts))
+        auto = f"[{C['green']}]∞ autoplay[/]" if self.auto else f"[{C['dim']}]autoplay off[/]"
+        self.query_one("#tabs").update(" ".join(parts) + "   " + auto)
 
     def render_footer(self):
         if self.focused is self.query_one("#list"):
@@ -302,6 +308,39 @@ class YtmApp(App):
                 self.player.queue(t.url)
         if self.view == "queue":
             self.fill_list()
+
+    # ---- autoplay ----
+    def queue_ids(self):
+        ids = []
+        for e in self.player.playlist():
+            m = VID_RE.search(e.get("filename", ""))
+            if m:
+                ids.append(m.group(1))
+        return ids
+
+    def maybe_autofill(self):
+        """When playing one of the last two songs, append a mix seeded from the last one."""
+        if not self.auto or self._filling:
+            return
+        pos, count = self.state.get("playlist-pos"), self.state.get("playlist-count")
+        if pos is None or pos < 0 or not count or pos < count - 2:
+            return
+        ids = self.queue_ids()
+        if ids:
+            self._filling = True
+            self.autofill(ids[-1], set(ids))
+
+    @work(thread=True, group="autoplay")
+    def autofill(self, seed, existing):
+        try:
+            new = [t for t in search.radio(seed, limit=30) if t.video_id not in existing][:10]
+            if new:
+                self.call_from_thread(self.play_tracks, new, False)
+                self.call_from_thread(self.say, f"autoplay · added {len(new)} similar songs")
+        except Exception as e:
+            self.call_from_thread(self.say, f"autoplay failed: {escape(str(e))}")
+        finally:
+            self.call_from_thread(setattr, self, "_filling", False)
 
     @work(thread=True, exclusive=True)
     def do_search(self, query, action):
@@ -351,6 +390,11 @@ class YtmApp(App):
                     self.do_search(arg, action)
             elif cmd in ("queue", "history", "results") and not arg:
                 self.show(cmd)
+            elif cmd in ("auto", "autoplay"):
+                self.auto = not self.auto if not arg else arg.lower() in ("on", "1", "yes")
+                self.render_tabs()
+                self.say(f"autoplay {'on' if self.auto else 'off'}")
+                self.maybe_autofill()
             elif cmd in ("skip", "next", "n"):
                 p.next()
             elif cmd in ("prev", "back"):

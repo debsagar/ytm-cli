@@ -1,6 +1,11 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project are documented here. Versions follow [Semantic Versioning](https://semver.org).
+
+## [Unreleased]
+
+### Added
+- Autoplay (on by default): when the queue is almost done, 10 similar songs are added automatically. Toggle with `auto`.
 
 ## [0.2.0] - 2026-10-18
 
