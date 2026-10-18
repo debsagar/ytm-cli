@@ -44,6 +44,38 @@ def find_tools():
     return mpv, ytdl
 
 
+def _kill_with_parent(proc):
+    """Windows: put mpv in a job object that is killed when this process ends,
+    however it ends (quit, closed window, crash). Returns the job handle to keep alive."""
+    if os.name != "nt":
+        return None
+    import ctypes
+    from ctypes import wintypes
+
+    class Basic(ctypes.Structure):
+        _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
+                    ("LimitFlags", wintypes.DWORD), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                    ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wintypes.DWORD),
+                    ("Affinity", ctypes.c_size_t), ("PriorityClass", wintypes.DWORD),
+                    ("SchedulingClass", wintypes.DWORD)]
+
+    class Extended(ctypes.Structure):
+        _fields_ = [("Basic", Basic), ("Io", ctypes.c_uint64 * 6), ("ProcessMemoryLimit", ctypes.c_size_t),
+                    ("JobMemoryLimit", ctypes.c_size_t), ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                    ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.CreateJobObjectW.restype = wintypes.HANDLE
+    k32.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+    k32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+    job = k32.CreateJobObjectW(None, None)
+    info = Extended()
+    info.Basic.LimitFlags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    k32.SetInformationJobObject(job, 9, ctypes.byref(info), ctypes.sizeof(info))  # 9 = ExtendedLimitInformation
+    k32.AssignProcessToJobObject(job, int(proc._handle))
+    return job
+
+
 def _open_pipe(path, timeout=5.0):
     # The pipe only exists once mpv has started, so retry for a few seconds.
     end = time.time() + timeout
@@ -73,6 +105,7 @@ class Player:
         if ytdl:
             args.append(f"--script-opts=ytdl_hook-ytdl_path={ytdl}")
         self.proc = subprocess.Popen(args, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        self._job = _kill_with_parent(self.proc)
         self._ids = itertools.count(1)
         self._lock = threading.Lock()
         self._cmd = _open_pipe(self.pipe)
@@ -157,11 +190,12 @@ class Player:
         return self.get("playlist") or []
 
     def close(self):
+        # Send quit without waiting for a reply (mpv may exit before answering).
         try:
-            self.command("quit")
-        except (OSError, RuntimeError):
+            self._cmd.write(b'{"command": ["quit"]}\n')
+        except OSError:
             pass
         try:
-            self.proc.wait(timeout=3)
+            self.proc.wait(timeout=2)
         except subprocess.TimeoutExpired:
             self.proc.kill()

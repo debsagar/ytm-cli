@@ -11,6 +11,9 @@ All notable changes to this project are documented here. Versions follow [Semant
 - Playlists: add any song (≡ button or `s`), `save <name>` saves the queue, **playlists** tab to open, play, queue or delete them.
 - Add to queue from history, liked songs and playlists.
 
+### Fixed
+- mpv no longer keeps running after the app exits (including when the window is closed).
+
 ## [0.3.0] - 2026-10-18
 
 ### Added
