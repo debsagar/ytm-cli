@@ -4,13 +4,25 @@ rem PowerShell only resolves what to play and exits; this shim then starts
 rem mpv, so the only things left in memory are mpv and a tiny cmd.exe.
 setlocal DisableDelayedExpansion
 
-rem No arguments: open the full-screen app (Python, ytm\app.py).
-if "%~1"=="" (
-    pushd "%~dp0"
-    "%USERPROFILE%\.venvs\ytm\Scripts\python.exe" -m ytm
-    popd
-    exit /b
-)
+rem No arguments: open the mini-player app (ytm\app.py) in its own small
+rem Windows Terminal window. "ytm here" runs it in the current terminal.
+set "YTM_PY=%USERPROFILE%\.venvs\ytm\Scripts\python.exe"
+if /i "%~1"=="here" goto app
+if not "%~1"=="" goto classic
+where wt >nul 2>nul || goto app
+rem wt treats ";" as a command separator, so escape it in the folder path
+set "YTM_DIR=%~dp0."
+set "YTM_DIR=%YTM_DIR:;=\;%"
+start "" wt -w new --size 74,24 --title ytm -d "%YTM_DIR%" "%YTM_PY%" -m ytm
+exit /b 0
+
+:app
+pushd "%~dp0"
+"%YTM_PY%" -m ytm
+popd
+exit /b
+
+:classic
 set "YTM_OUT=%TEMP%\ytm-%RANDOM%-%RANDOM%.txt"
 set "YTM_MPV="
 set "YTM_TARGET="

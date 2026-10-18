@@ -1,11 +1,12 @@
-"""The full-screen terminal UI (Textual). Run with:  python -m ytm"""
+"""The terminal UI (Textual): a compact mini-player card. Run with:  python -m ytm"""
 
 import re
 
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
+from textual.containers import Vertical
+from textual.markup import escape
 from textual.widgets import Input, Label, ListItem, ListView, Static
 
 from . import library, search
@@ -13,73 +14,115 @@ from .player import Player
 from .search import Track
 
 HELP = (
-    "play <song|url>  queue <song>  radio <song>  search <song> (or just type)  history\n"
-    "skip  prev  pause  vol <0-100>  remove <n>  clear  quit      "
-    "keys: ctrl+space pause · ctrl+n next · ctrl+b prev · ctrl+←/→ seek · esc prompt"
+    "[b]play[/] <song|url>   [b]queue[/] <song>   [b]radio[/] <song>   or just type to search\n"
+    "[b]skip  prev  pause  vol[/] <n>   [b]remove[/] <n>   [b]clear[/]   [b]quit[/]\n"
+    "[dim]tab → list (enter play · a add · d remove · ←/→ switch view)   esc → prompt\n"
+    "ctrl+space pause · ctrl+n next · ctrl+b prev · ctrl+←/→ seek[/]"
 )
 URL_RE = re.compile(r"^(https?://)?((www|music|m)\.)?youtu(be\.com|\.be)/", re.I)
 VID_RE = re.compile(r"(?:v=|youtu\.be/)([\w-]{11})")
+# Noise YouTube adds to titles: "(Official Music Video)", "[Lyrics]", "| Lyrics" ...
+NOISE_RE = re.compile(
+    r"\s*([(\[][^)\]]*\b(official|video|lyrics?|letra|audio|visuali[sz]er|oficial|4k|hd)\b[^)\]]*[)\]]|\|\s*lyrics.*)",
+    re.I,
+)
+VIEWS = ["queue", "history", "results"]
 
 
 def fmt_time(s):
     if s is None:
-        return "--:--"
+        return "-:--"
     s = int(s)
     return f"{s // 60}:{s % 60:02d}"
 
 
-class TrackItem(ListItem):
-    def __init__(self, track: Track, text: str):
-        super().__init__(Label(text))
+def clean(title):
+    return NOISE_RE.sub("", title or "").strip() or (title or "")
+
+
+def split_label(label):
+    """'Uploader - Artist - Title' -> ('Title', 'Artist')."""
+    parts = [p.strip() for p in (label or "").split(" - ") if p.strip()]
+    if len(parts) >= 2:
+        return clean(parts[-1]), parts[-2]
+    return clean(label), ""
+
+
+def track_parts(t: Track):
+    if t.artist:
+        return clean(t.title), t.artist
+    return split_label(t.title)
+
+
+class Row(ListItem):
+    def __init__(self, track: Track, num: int, current=False, duration=""):
+        title, artist = (escape(x) for x in track_parts(track))
+        lead = "[b $accent]▶ [/]" if current else f"[dim]{num:>2}[/] "
+        name = f"[b]{title}[/]" if current else title
+        super().__init__(Label(lead + name + (f"  [dim]{artist}[/]" if artist else "")))
         self.track = track
+        self.duration = duration
 
 
 class YtmApp(App):
     TITLE = "ytm"
     ENABLE_COMMAND_PALETTE = False
     CSS = """
-    Screen { background: $background; }
-    #panels { height: 1fr; }
-    .panel { width: 1fr; border: round $primary; border-title-color: $accent; }
-    #queue { border: round $success; }
-    ListView { background: transparent; }
-    ListItem.--highlight { background: $primary 40%; }
-    #now { height: 3; padding: 0 1; border: round $accent; }
-    #msg { height: auto; color: $text-muted; padding: 0 1; }
-    #prompt { border: round $primary; }
+    Screen { align: center middle; background: $background; }
+    #card {
+        width: 100%; max-width: 84; height: 100%; max-height: 26;
+        border: round $primary 50%; padding: 0 1;
+    }
+    #title { text-style: bold; height: 1; color: $accent; }
+    #title, #artist, #list Label { text-wrap: nowrap; text-overflow: ellipsis; }
+    #artist { color: $text-muted; height: 1; }
+    #bar { height: 1; margin-top: 1; }
+    #tabs { height: 1; margin-top: 1; color: $text-muted; }
+    #list { height: 1fr; background: transparent; scrollbar-size-vertical: 1; }
+    #list > ListItem { background: transparent; }
+    #list > ListItem.-highlight { background: $primary 20%; }
+    #list:focus > ListItem.-highlight { background: $primary 35%; }
+    #msg { height: auto; max-height: 4; color: $text-muted; }
+    #prompt { border: none; background: transparent; padding: 0; height: 1; margin-top: 1; }
+    #prompt:focus { border: none; }
     """
     BINDINGS = [
-        Binding("ctrl+space", "pause", "pause", priority=True),
-        Binding("ctrl+n", "next", "next", priority=True),
-        Binding("ctrl+b", "prev", "prev", priority=True),
-        Binding("ctrl+right", "seek(10)", show=False, priority=True),
-        Binding("ctrl+left", "seek(-10)", show=False, priority=True),
-        Binding("escape", "focus_prompt", show=False),
-        Binding("a", "add_selected", "add to queue", show=False),
-        Binding("delete,d", "remove_selected", "remove", show=False),
-        Binding("ctrl+c,ctrl+q", "quit", "quit", priority=True),
+        Binding("ctrl+space", "pause", priority=True),
+        Binding("ctrl+n", "next", priority=True),
+        Binding("ctrl+b", "prev", priority=True),
+        Binding("ctrl+right", "seek(10)", priority=True),
+        Binding("ctrl+left", "seek(-10)", priority=True),
+        Binding("escape", "focus_prompt"),
+        Binding("left", "view(-1)"),
+        Binding("right", "view(1)"),
+        Binding("a", "add_selected"),
+        Binding("delete,d", "remove_selected"),
+        Binding("ctrl+c,ctrl+q", "quit", priority=True),
     ]
 
     def __init__(self):
         super().__init__()
+        self.theme = "catppuccin-mocha"
         self.state = {"media-title": None, "time-pos": None, "duration": None,
                       "pause": False, "volume": 70, "playlist-pos": -1}
-        self.labels = {}  # video id -> "Artist - Title", for queue display
+        self.known = {}  # video id -> Track, so the queue can show proper titles
+        self.results = []
+        self.view = "history"
         self._last_sec = None
 
     def compose(self) -> ComposeResult:
-        with Horizontal(id="panels"):
-            yield ListView(id="queue", classes="panel")
-            yield ListView(id="side", classes="panel")
-        yield Static(id="now")
-        yield Static(HELP, id="msg")
-        yield Input(placeholder="type a song to search, or a command (help)", id="prompt")
+        with Vertical(id="card"):
+            yield Static(id="title")
+            yield Static(id="artist")
+            yield Static(id="bar")
+            yield Static(id="tabs")
+            yield ListView(id="list")
+            yield Static(id="msg")
+            yield Input(placeholder="search or command · ? for help", id="prompt")
 
     def on_mount(self):
-        self.query_one("#queue").border_title = "Queue"
-        self.query_one("#side").border_title = "History"
         self.player = Player(on_change=self._from_mpv)
-        self.show_history()
+        self.show("history")
         self.render_now()
         self.query_one("#prompt").focus()
 
@@ -87,9 +130,12 @@ class YtmApp(App):
         if hasattr(self, "player"):
             self.player.close()
 
+    def on_resize(self):
+        self.render_now()
+
     # ---- mpv events (arrive on a background thread) ----
     def _from_mpv(self, name, value):
-        if name == "time-pos":  # fires many times a second; only redraw once per second
+        if name == "time-pos":  # fires many times a second; redraw once per second
             sec = None if value is None else int(value)
             if sec == self._last_sec:
                 return
@@ -101,113 +147,136 @@ class YtmApp(App):
 
     def _apply(self, name, value):
         self.state[name] = value
-        if name in ("playlist-pos", "playlist-count", "media-title"):
-            self.refresh_queue()
+        if name in ("playlist-pos", "playlist-count") and self.view == "queue":
+            self.fill_list()
         self.render_now()
 
     # ---- drawing ----
+    def current_track(self):
+        pos = self.state["playlist-pos"]
+        entries = self.player.playlist() if pos is not None and pos >= 0 else []
+        if 0 <= (pos or 0) < len(entries):
+            m = VID_RE.search(entries[pos].get("filename", ""))
+            if m and m.group(1) in self.known:
+                return self.known[m.group(1)]
+        return None
+
     def render_now(self):
         s = self.state
-        title = s["media-title"] or "nothing playing"
+        t = self.current_track() if hasattr(self, "player") else None
+        if t:
+            title, artist = track_parts(t)
+        elif s["media-title"]:
+            title, artist = split_label(s["media-title"])
+        else:
+            title, artist = "Nothing playing", "type a song below to start"
+        icon = "⏸ " if s["pause"] else ""
+        self.query_one("#title").update(icon + escape(title))
+        self.query_one("#artist").update(escape(artist))
+
         pos, dur = s["time-pos"], s["duration"]
-        width = 40
+        right = f"  {fmt_time(pos)} / {fmt_time(dur)}  vol {int(s['volume'] or 0)}"
+        width = max(10, self.query_one("#card").content_size.width - len(right))
         filled = int(width * pos / dur) if pos and dur else 0
-        bar = "━" * filled + "●" + "─" * (width - filled)
-        icon = "⏸" if s["pause"] else "▶"
-        vol = int(s["volume"] or 0)
-        self.query_one("#now").update(
-            f"[b]{icon} {title}[/b]\n[$accent]{bar}[/]  {fmt_time(pos)} / {fmt_time(dur)}   vol {vol}%"
+        self.query_one("#bar").update(
+            f"[$accent]{'━' * filled}[/][$panel-lighten-2]{'━' * (width - filled)}[/][dim]{right}[/]"
         )
 
-    def refresh_queue(self):
-        lv = self.query_one("#queue", ListView)
-        entries = self.player.playlist()
+    def render_tabs(self):
+        parts = []
+        for v in VIEWS:
+            if v == "results" and not self.results:
+                continue
+            parts.append(f"[b $background on $accent] {v} [/]" if v == self.view else f"[dim] {v} [/]")
+        self.query_one("#tabs").update(" ".join(parts))
+
+    def fill_list(self):
+        lv = self.query_one("#list", ListView)
         old = lv.index
         lv.clear()
-        for i, e in enumerate(entries):
-            url = e.get("filename", "")
-            m = VID_RE.search(url)
-            vid = m.group(1) if m else url
-            label = self.labels.get(vid) or (self.state["media-title"] if e.get("current") else None) or url
-            mark = "▶" if e.get("current") else " "
-            lv.append(TrackItem(Track(vid, label), f"{mark} {i + 1:>2}. {label}"))
-        if old is not None and entries:
-            lv.index = min(old, len(entries) - 1)
+        if self.view == "queue":
+            for i, e in enumerate(self.player.playlist()):
+                url = e.get("filename", "")
+                m = VID_RE.search(url)
+                vid = m.group(1) if m else url
+                t = self.known.get(vid) or Track(vid, self.state["media-title"] if e.get("current") else url)
+                lv.append(Row(t, i + 1, current=bool(e.get("current"))))
+        else:
+            tracks = self.results if self.view == "results" else library.history(100)
+            for i, t in enumerate(tracks, 1):
+                lv.append(Row(t, i))
+        if old is not None and lv.children:
+            lv.index = min(old, len(lv.children) - 1)
+        self.render_tabs()
 
-    def set_side(self, title, tracks):
-        lv = self.query_one("#side", ListView)
-        lv.border_title = title
-        lv.clear()
-        for i, t in enumerate(tracks, 1):
-            extra = f"  [dim]{t.duration}[/]" if t.duration else ""
-            lv.append(TrackItem(t, f"{i:>2}. {t.label}{extra}"))
+    def show(self, view):
+        if view != self.view:
+            self.query_one("#list", ListView).index = 0
+        self.view = view
+        self.fill_list()
 
     def say(self, text):
         self.query_one("#msg").update(text)
 
-    def show_history(self):
-        self.set_side("History", library.history(50))
-
     # ---- adding music ----
-    def _remember(self, tracks):
-        for t in tracks:
-            self.labels[t.video_id] = t.label
-
     def play_tracks(self, tracks, replace):
-        self._remember(tracks)
+        for t in tracks:
+            self.known[t.video_id] = t
         for i, t in enumerate(tracks):
             if replace and i == 0:
                 self.player.play(t.url)
             else:
                 self.player.queue(t.url)
-        self.refresh_queue()
+        if self.view == "queue":
+            self.fill_list()
 
     @work(thread=True, exclusive=True)
     def do_search(self, query, action):
         """Network lookups run on a worker thread so the UI never freezes."""
-        self.call_from_thread(self.say, f"searching '{query}' ...")
+        self.call_from_thread(self.say, f"[dim]searching {query} …[/]")
         try:
             results = search.search(query)
             if not results:
-                self.call_from_thread(self.say, f"no results for '{query}'")
+                self.call_from_thread(self.say, f"no results for {query}")
                 return
             top = results[0]
             if action == "search":
-                self.call_from_thread(self.set_side, f"Results: {query}", results)
-                self.call_from_thread(self.say, "enter = play · a = add to queue · esc = back to prompt")
-                self.call_from_thread(self.query_one("#side").focus)
+                self.results = results
+                self.call_from_thread(self.show, "results")
+                self.call_from_thread(self.say, "")
+                self.call_from_thread(self.query_one("#list").focus)
             elif action == "radio":
                 tracks = search.radio(top.video_id) or [top]
                 self.call_from_thread(self.play_tracks, tracks, True)
-                self.call_from_thread(self.say, f"radio from {top.label} ({len(tracks)} tracks)")
+                self.call_from_thread(self.show, "queue")
+                self.call_from_thread(self.say, f"[dim]radio · {len(tracks)} tracks[/]")
             else:
                 self.call_from_thread(self.play_tracks, [top], action == "play")
-                verb = "playing" if action == "play" else "queued"
-                self.call_from_thread(self.say, f"{verb} {top.label}")
+                self.call_from_thread(self.say, f"[dim]{'playing' if action == 'play' else 'queued'} {top.label}[/]")
         except Exception as e:  # network errors etc. should not kill the app
-            self.call_from_thread(self.say, f"[red]error:[/] {e}")
+            self.call_from_thread(self.say, f"[red]{e}[/]")
 
     # ---- the prompt ----
     @on(Input.Submitted, "#prompt")
     def run_command(self, event):
         line = event.value.strip()
         event.input.value = ""
+        self.say("")
         if not line:
             return
         cmd, _, arg = line.partition(" ")
         cmd, arg = cmd.lower(), arg.strip()
         p = self.player
         try:
-            if cmd in ("play", "queue", "q+", "radio", "search", "s"):
-                if not arg:
-                    return self.say(f"usage: {cmd} <song>")
+            if cmd in ("play", "queue", "q+", "radio", "search", "s") and arg:
                 action = {"q+": "queue", "s": "search"}.get(cmd, cmd)
                 if URL_RE.match(arg) and action in ("play", "queue"):
                     url = arg if arg.startswith("http") else "https://" + arg
                     (p.play if action == "play" else p.queue)(url)
-                    self.say(f"{action}: {url}")
                 else:
                     self.do_search(arg, action)
+            elif cmd in ("queue", "history", "results") and not arg:
+                self.show(cmd)
             elif cmd in ("skip", "next", "n"):
                 p.next()
             elif cmd in ("prev", "back"):
@@ -216,15 +285,12 @@ class YtmApp(App):
                 p.toggle_pause()
             elif cmd in ("vol", "volume"):
                 p.set_volume(int(arg))
-            elif cmd in ("history", "h"):
-                self.show_history()
-                self.query_one("#side").focus()
             elif cmd in ("remove", "rm"):
                 p.remove(int(arg) - 1)
-                self.refresh_queue()
+                self.show("queue")
             elif cmd == "clear":
                 p.clear()
-                self.refresh_queue()
+                self.show("queue")
             elif cmd in ("quit", "exit"):
                 self.exit()
             elif cmd in ("help", "?"):
@@ -234,34 +300,41 @@ class YtmApp(App):
             else:
                 self.do_search(line, "search")  # plain text = search
         except (ValueError, IndexError):
-            self.say(f"bad argument for '{cmd}'")
+            self.say(f"bad argument for {cmd}")
         except RuntimeError as e:
             self.say(f"[red]{e}[/]")
 
     # ---- list interaction ----
     @on(ListView.Selected)
     def picked(self, event):
-        item = event.item
-        if not isinstance(item, TrackItem):
+        if not isinstance(event.item, Row):
             return
-        if event.list_view.id == "queue":
+        if self.view == "queue":
             self.player.jump(event.list_view.index)
         else:
-            self.play_tracks([item.track], True)
-            self.say(f"playing {item.track.label}")
+            self.play_tracks([event.item.track], True)
+
+    def _selected(self):
+        lv = self.query_one("#list", ListView)
+        return lv.highlighted_child if self.focused is lv and isinstance(lv.highlighted_child, Row) else None
 
     def action_add_selected(self):
-        lv = self.focused
-        if isinstance(lv, ListView) and lv.id == "side" and isinstance(lv.highlighted_child, TrackItem):
-            t = lv.highlighted_child.track
-            self.play_tracks([t], False)
-            self.say(f"queued {t.label}")
+        row = self._selected()
+        if row and self.view != "queue":
+            self.play_tracks([row.track], False)
+            self.say(f"[dim]queued {row.track.label}[/]")
 
     def action_remove_selected(self):
-        lv = self.focused
-        if isinstance(lv, ListView) and lv.id == "queue" and lv.index is not None:
-            self.player.remove(lv.index)
-            self.refresh_queue()
+        row = self._selected()
+        if row and self.view == "queue":
+            self.player.remove(self.query_one("#list", ListView).index)
+            self.fill_list()
+
+    def action_view(self, step):
+        if self.focused is not self.query_one("#list"):
+            return
+        views = [v for v in VIEWS if v != "results" or self.results]
+        self.show(views[(views.index(self.view) + step) % len(views)])
 
     # ---- hotkeys ----
     def action_pause(self):
