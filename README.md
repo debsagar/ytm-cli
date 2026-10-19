@@ -66,6 +66,12 @@ ytm finds mpv in `C:\Program Files\MPV Player`, a `bin` folder inside the repo, 
 
 Each song gets a theme: colours, a scrolling motif, a progress-bar style and one of four layouts: **classic** (album art and the song list), **hero** (big art and a spaced-out title), **stage** (an animated equaliser next to the art) or **focus** (just the song, centred). There are 13 built-in themes, such as *neon rave*, *rainy window* and *pit wall*.
 
+| hero | stage |
+|---|---|
+| ![hero layout](docs/layout-hero.png) | ![stage layout](docs/layout-stage.png) |
+| **classic** | **focus** |
+| ![classic layout](docs/layout-classic.png) | ![focus layout](docs/layout-focus.png) |
+
 - **◐ theme** cycles through every theme.
 - **vibe** switches between calm (focus layout, no decoration), normal and loud (stage layout).
 
@@ -85,6 +91,24 @@ This copies public or unlisted YouTube Music playlists into your local playlists
 - When 3 or more songs fit no theme but sit close to each other, an LLM (Claude Haiku via [OpenRouter](https://openrouter.ai)) designs a new theme for them, up to 24 themes in total.
 
 To turn it on, create `%USERPROFILE%\.config\ytm\secrets.env` (outside the repo) with one line per key: `TYPESAFE_API_KEY=` followed by your TypeSafe key, and `OPENROUTER_API_KEY=` followed by your OpenRouter key. Environment variables with the same names also work. Jev needs only `TYPESAFE_API_KEY`; without `OPENROUTER_API_KEY`, no new themes are written. With no keys at all, the brain is off and everything else works as normal.
+
+Every paid call is logged with its tokens and price. The footer shows what the brain has spent today, and `cost` shows today, this month and all time. Jev costs about $0.00003 per song; a new theme costs about $0.0004.
+
+### Settings
+
+Type `set` to see every setting and `set <key> <value>` to change one (`mode off` is a shortcut for `set mode off`). They are saved in `%USERPROFILE%\.config\ytm\settings.toml`, which you can also edit by hand while ytm runs.
+
+![the settings popup](docs/settings.png)
+
+| Setting | Default | What it does |
+|---|---|---|
+| `mode` | `jev` | `off`: no paid calls (songs measured before still get their theme). `jev`: measure new songs, and let the LLM write the occasional new theme. `yolo`: reserved for LLM-designed widgets |
+| `budget_day`, `budget_month` | `0.05`, `1.0` | Dollar limits. LLM work pauses at 80% of either, Jev stops at 100% |
+| `restyle` | `song` | When the look may change: `song`, `every 3` (songs), `10min`, or `pinned` |
+| `stickiness` | `0.5` | 0 switches to the best theme every time; 1 only for big changes. On 84 test songs, 0.5 changed the look about every 3 songs and 1 about every 12 |
+| `can_change` | colours, motif, layout | Which parts a restyle may change; e.g. `set can_change colours` keeps your layout fixed |
+| `motion` | `full` | Animation: `full`, `low` (one frame a second) or `off` |
+| `grow_themes`, `max_new_themes_week` | `auto`, `3` | Whether and how often the LLM may write new themes |
 
 ## Classic commands
 

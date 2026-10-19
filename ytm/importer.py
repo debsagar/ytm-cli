@@ -8,7 +8,7 @@ and taste data are ready before you press play."""
 import re
 import sys
 
-from . import brain, library
+from . import brain, library, settings
 from .search import Track, _api, _track
 
 LIST_RE = re.compile(r"[?&]list=([\w-]+)")
@@ -30,11 +30,14 @@ def main(args):
     for url in [a for a in args if not a.startswith("--") and a != "import"]:  # ytm.cmd passes "import" too
         title, tracks, added = import_playlist(lib, url)
         print(f"{title}: {len(tracks)} songs ({added} new)")
-        if judge and brain.enabled():
-            for i, t in enumerate(tracks, 1):
-                if not lib.features(t.video_id):
-                    f = brain.think({"id": t.video_id, "title": t.title, "artist": t.artist}, lib)
-                    print(f"  {i:>3}/{len(tracks)} {t.title[:40]:40} {f['theme']} · {f['mood']} · {f['tags']}")
+        for i, t in enumerate(tracks, 1):
+            if judge and not lib.features(t.video_id):
+                jev, llm, why = brain.budget(lib, settings.Settings())  # re-checked per song
+                if not jev:
+                    print(f"  stopped judging: {why}")
+                    break
+                f = brain.think({"id": t.video_id, "title": t.title, "artist": t.artist}, lib, llm)
+                print(f"  {i:>3}/{len(tracks)} {t.title[:40]:40} {f['theme']} · {f['mood']} · {f['tags']}")
 
 
 if __name__ == "__main__":

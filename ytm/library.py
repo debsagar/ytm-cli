@@ -6,11 +6,11 @@ import sqlite3
 import threading
 import time
 
-from .player import MPV_CONFIG, ROOT
+from .player import HOME
 from .search import Track
 
-HISTORY = MPV_CONFIG / "history.tsv"
-DB = ROOT / "data" / "ytm.db"
+HISTORY = HOME / "mpv" / "history.tsv"
+DB = HOME / "data" / "ytm.db"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tracks (id TEXT PRIMARY KEY, title TEXT, artist TEXT, duration TEXT);
@@ -134,11 +134,21 @@ class Library:
     def themes(self):
         return [json.loads(r[0]) for r in self._q("SELECT spec FROM themes ORDER BY created")]
 
+    def themes_since(self, at):
+        """How many themes were written since a unix time."""
+        return self._q("SELECT COUNT(*) FROM themes WHERE created>=?", (at,))[0][0]
+
     def save_theme(self, spec):
         self._q("INSERT OR REPLACE INTO themes VALUES (?,?,?)", (spec["name"], json.dumps(spec), time.time()))
 
     def log(self, type_, video_id="", **data):
         self._q("INSERT INTO events VALUES (?,?,?,?)", (time.time(), type_, video_id, json.dumps(data)))
+
+    def spend(self, since=0.0):
+        """{api: (calls, usd)} for paid calls logged since a unix time."""
+        rows = self._q("SELECT json_extract(data, '$.api'), COUNT(*), SUM(json_extract(data, '$.usd')) "
+                       "FROM events WHERE type='cost' AND at>=? GROUP BY 1", (since,))
+        return {api: (n, usd or 0.0) for api, n, usd in rows}
 
     def profile(self, limit=15):
         """Small taste summary for prompts: top artists and playlist names."""

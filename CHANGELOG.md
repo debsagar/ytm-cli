@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here. Versions follow [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- Settings in `%USERPROFILE%\.config\ytm\settings.toml`, picked up live when the file changes; `set` lists them, `set <key> <value>` changes one.
+  - `mode` off · jev · yolo; `budget_day` and `budget_month`: LLM work pauses at 80% of a budget, Jev stops at 100%. Songs measured before keep their theme for free.
+  - How fast the look changes: `restyle` (every song, every N songs, every N minutes, or pinned), `stickiness` (a new theme must fit clearly better before the look switches) and `can_change` (colours, motif, layout).
+  - `motion` (full, low, off), `grow_themes` and `max_new_themes_week` for the LLM.
+  - Every change is logged as an event.
+- The help popup scrolls when the window is short.
+- Cost tracking: every Jev and LLM call is logged with its tokens and price. The footer shows today's spend, and `cost` breaks it down by today, this month and all time.
+
+### Changed
+- README screenshots now show per-song themes, the four layouts and the settings popup.
+
 ## [0.4.0] - 2026-10-19
 
 ### Added
