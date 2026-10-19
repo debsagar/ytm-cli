@@ -34,8 +34,9 @@ def switch(branch):
     r = git("fetch", "-q", "origin", f"{branch}:{branch}")
     if r.returncode == 0:
         r = git("checkout", "-q", branch, "--")  # "--": the repo also has a dev/ folder
-    if r.returncode == 0:
-        git("branch", "-q", f"--set-upstream-to=origin/{branch}", branch)
+    if r.returncode == 0:  # track origin; set by hand, as a --single-branch clone has no origin/dev ref
+        git("config", f"branch.{branch}.remote", "origin")
+        git("config", f"branch.{branch}.merge", f"refs/heads/{branch}")
     return r
 
 
@@ -46,9 +47,10 @@ def main(args=None):
         return 2
     r = git("fetch", "-q", "origin")
     if r.returncode == 0:
-        if args:
-            r = switch(CHANNELS[args[0].lower()])
-        elif current_branch() is None:
+        branch = CHANNELS[args[0].lower()] if args else current_branch()
+        if branch in CHANNELS.values():
+            r = switch(branch)
+        elif branch is None:  # pinned
             r = git("checkout", "-q", "--detach", "origin/main")
         else:
             r = git("pull", "-q", "--ff-only")

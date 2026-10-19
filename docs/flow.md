@@ -28,7 +28,7 @@ ytm.cmd [args]
 
 ### The other modules
 
-- `python -m ytm.update [stable|dev]` → `ytm/update.py:main`: `git fetch`. With no word, `checkout --detach origin/main` on a detached HEAD or `pull --ff-only` on a branch. With `stable` or `dev` (`main` or `dev`), `switch`: `pull --ff-only` if already on it, else `fetch origin <b>:<b>` (creates or fast-forwards the local branch), `checkout <b>` and set it to track `origin/<b>`. Then `uv sync --frozen --no-dev`. Prints the new version and channel. Any other word prints usage and changes nothing.
+- `python -m ytm.update [stable|dev]` → `ytm/update.py:main`: `git fetch`, then picks a branch: `main` for `stable`, `dev` for `dev`, or with no word the current one. On `main` or `dev` it runs `switch`: `pull --ff-only origin <b>` if already on it, else `fetch origin <b>:<b>` (creates or fast-forwards the local branch), `checkout <b> --` and sets it to track `origin/<b>`. A detached HEAD gets `checkout --detach origin/main`, any other branch `pull --ff-only`. Then `uv sync --frozen --no-dev`. Prints the new version and channel. Any other word prints usage and changes nothing.
 - `python -m ytm.importer <urls> [--judge]` → `ytm/importer.py:main` → `import_playlist` (`search._api().get_playlist` → `Library.add_to_playlist`). `--judge` calls `brain.budget` and then `brain.think` once per new song, on the main thread. No UI is running.
 - `python -m ytm.context [state|jev|theme|widget|profile] [video id]` → `ytm/context.py:main` prints `state(lib)` or `slice_for(...)` and their sizes. It reads the library and makes no network calls.
 
