@@ -87,7 +87,7 @@ def track_parts(t: Track):
 def tidy(t: Track):
     """A Track with clean title/artist fields, for saving to likes and playlists."""
     title, artist = track_parts(t)
-    return Track(t.video_id, title, artist, t.duration)
+    return Track(t.video_id, title, artist, t.duration, t.album)
 
 
 def fmt_usd(usd):

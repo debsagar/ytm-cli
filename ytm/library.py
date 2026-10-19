@@ -61,7 +61,10 @@ class Library:
             return self.db.execute(sql, args).fetchall()
 
     def _save(self, t: Track):
-        self._q("INSERT OR REPLACE INTO tracks VALUES (?,?,?,?,?)",
+        # a track from history has no album or duration: keep the ones already stored
+        self._q("INSERT INTO tracks VALUES (?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title, "
+                "artist=excluded.artist, duration=COALESCE(NULLIF(excluded.duration, ''), duration), "
+                "album=COALESCE(NULLIF(excluded.album, ''), album)",
                 (t.video_id, t.title, t.artist, t.duration, t.album))
 
     def _tracks(self, sql, args=()):
