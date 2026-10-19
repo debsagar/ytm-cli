@@ -15,7 +15,7 @@ Run it with `ytm` (own small window) or `ytm here` (current terminal). See the R
 
 ## ytm vs ytmdev
 
-`ytm` runs a pinned copy of the code on your real library. `ytmdev` runs your working checkout on a copy of your data in `%USERPROFILE%\.ytmdev`. A git-ignored `ytm.home` file next to the code (or the `YTM_HOME` environment variable) picks the data folder. Details are in [dev/README.md](dev/README.md).
+`ytm` runs a normal install of the latest release on your real library (`ytm update` pulls the next one). `ytmdev` runs your working checkout on a copy of your data in `%USERPROFILE%\.ytmdev`. A git-ignored `ytm.home` file next to the code (or the `YTM_HOME` environment variable) picks the data folder. Details are in [dev/README.md](dev/README.md).
 
 ## Branches and pull requests
 

@@ -16,13 +16,7 @@ The loop:
 
 ## ytm vs ytmdev
 
-- `ytm` runs a pinned copy of the code (a git worktree at `G:\Projects\ytm-stable`) on your real library.
+- `ytm` runs a normal install of the latest release (a clone of `main`, e.g. `C:\Tools\ytm`). `ytm update` pulls the next release.
 - `ytmdev` runs this checkout on a copy of your data in `%USERPROFILE%\.ytmdev`.
 
-A `ytm.home` file next to the code (git-ignored) says which data folder that copy uses; `YTM_HOME` overrides it.
-
-To move the stable copy forward to a newer commit:
-
-```powershell
-git -C G:\Projects\ytm-stable checkout --detach <commit>
-```
+A `ytm.home` file next to the code (git-ignored) names the folder holding `data\ytm.db` and `mpv\history.tsv` for that copy; `YTM_HOME` overrides it. Without either, the data lives inside the code folder.
