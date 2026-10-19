@@ -65,13 +65,6 @@ HELP_ROWS = [
 ]
 
 
-def fmt_time(s):
-    if s is None:
-        return "-:--"
-    s = int(s)
-    return f"{s // 60}:{s % 60:02d}"
-
-
 def clean(title):
     return NOISE_RE.sub("", title or "").strip() or (title or "")
 
@@ -425,7 +418,7 @@ class YtmApp(App):
             try:
                 self.player.command("set_property", "pause", True)
                 self.player.command("loadfile", t.url, "replace", -1, f"start={r['at']}")  # mpv ≥ 0.38
-                note = f"resume · {escape(s['title'])} at {fmt_time(r['at'])} · press ⏯"
+                note = f"resume · {escape(s['title'])} at {theme.fmt(r['at'])} · press ⏯"
                 self.set_timer(2, lambda: self.say(note))  # shortcut: after the song's theme note, not ordered
             except RuntimeError:
                 pass
@@ -565,11 +558,8 @@ class YtmApp(App):
         self.lib.log("vibe", self.current_id() or "", to=self.vibe)
         self.say(f"vibe {self.vibe}")
 
-    def library_themes(self):
-        return theme.PRESETS + self.lib.themes()
-
     def theme_named(self, name):
-        return next((t for t in self.library_themes() if t["name"] == name), theme.DEFAULT)
+        return next((t for t in brain.all_themes(self.lib) if t["name"] == name), theme.DEFAULT)
 
     def song_dict(self, vid):
         t = self.known.get(vid)
@@ -952,7 +942,7 @@ class YtmApp(App):
         def done(name):
             if name:
                 n = self.lib.add_to_playlist(name, [tidy(t) for t in tracks])
-                self.say(f"≡ added {n} song{'s' * (n != 1)} to {escape(name)}")
+                self.say(f"≡ added {songs(n)} to {escape(name)}")
                 if self.view in ("playlists", "playlist"):
                     self.fill_list()
         self.push_screen(PlaylistPicker(self.lib.playlists(), what), done)
@@ -1060,7 +1050,7 @@ class YtmApp(App):
         elif bid == "auto":
             self.toggle_auto()
         elif bid == "theme":  # instant: cycle through every theme in the library
-            names = [t["name"] for t in self.library_themes()]
+            names = [t["name"] for t in brain.all_themes(self.lib)]
             cur = self.theme_spec["name"]
             nxt = names[(names.index(cur) + 1) % len(names)] if cur in names else names[0]
             self.restyle(self.theme_named(nxt))
