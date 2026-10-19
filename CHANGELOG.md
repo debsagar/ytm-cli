@@ -4,6 +4,9 @@ All notable changes to this project are documented here. Versions follow [Semant
 
 ## [Unreleased]
 
+### Added
+- One-command install: `irm https://raw.githubusercontent.com/debsagar/ytm-cli/main/install.ps1 | iex` installs missing dependencies with winget, clones ytm into `%LOCALAPPDATA%\ytm`, sets up its packages and adds the `ytm` command. Running it again updates.
+
 ## [0.5.1] - 2026-10-19
 
 ### Changed
