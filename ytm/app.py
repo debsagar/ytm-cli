@@ -935,7 +935,8 @@ class YtmApp(App):
         """Network lookups run on a worker thread so the UI never freezes."""
         self.call_from_thread(self.say, f"searching {escape(query)} …")
         try:
-            results = search.search(query)
+            m = VID_RE.search(query) if action == "radio" and URL_RE.match(query) else None
+            results = [Track(m.group(1), query)] if m else search.search(query)  # radio <link>: seed from it
             if not results:
                 self.call_from_thread(self.say, f"no results for {escape(query)}")
                 return
