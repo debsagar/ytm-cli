@@ -120,7 +120,7 @@ Type `set` to see every setting and `set <key> <value>` to change one (`mode off
 
 ### Updating
 
-`ytm update` moves your copy to the latest release and installs any new Python packages. Your library, history and settings live outside the code and are not touched. If you've edited files in that folder, git refuses and nothing changes.
+`ytm update` moves your copy to the latest release and installs any new Python packages. Your library and history are not touched: they live in the code folder's `data` and `mpv\history.tsv`, which git ignores, unless a `ytm.home` file or `YTM_HOME` points elsewhere. Your settings live in `%USERPROFILE%\.config\ytm`. If you've edited the code's own files, git refuses and nothing changes.
 
 ## Classic commands
 
