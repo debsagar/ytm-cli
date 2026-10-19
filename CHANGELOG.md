@@ -11,6 +11,7 @@ All notable changes to this project are documented here. Versions follow [Semant
   - `motion` (full, low, off), `grow_themes` and `max_new_themes_week` for the LLM.
   - Every change is logged as an event.
 - The help popup scrolls when the window is short.
+- `ytm/context.py` builds what the app knows about you (taste, playlists as contexts, skips, time of day, the latest session) from the library, history and events, with no LLM calls, and gives each model a small capped slice of it. New themes are now written with this slice instead of a plain list of artists. `python -m ytm.context` prints the slices. See `docs/context.md`.
 - Cost tracking: every Jev and LLM call is logged with its tokens and price. The footer shows today's spend, and `cost` breaks it down by today, this month and all time.
 
 ### Changed
