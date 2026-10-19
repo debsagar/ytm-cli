@@ -15,6 +15,7 @@ draws from the primitives below, so any spec (even a broken one) renders safely.
 """
 
 import re
+import unicodedata
 
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 
@@ -200,25 +201,40 @@ def equaliser(width, rows, t, energy):
 
 
 def spaced(title):
-    """HERO TITLE STYLE: uppercase with letter spacing."""
-    return " ".join(title.upper())
+    """HERO TITLE STYLE: uppercase with letter spacing. Accents stay attached to their letter."""
+    chars = []
+    for ch in unicodedata.normalize("NFC", title.upper()):
+        if chars and unicodedata.combining(ch):
+            chars[-1] += ch
+        else:
+            chars.append(ch)
+    return " ".join(chars)
 
 
 def fmt(s):
     if s is None:
         return "-:--"
-    s = int(s)
+    s = max(0, int(s))
     return f"{s // 60}:{s % 60:02d}"
 
 
+def _clamp(pos, dur):
+    """Position within [0, duration]: mpv can briefly report past the end, or negative."""
+    pos = max(0, pos or 0)
+    return min(pos, dur) if dur else pos
+
+
 def progress_label(theme, pos, dur):
-    pct = int(100 * pos / dur) if pos and dur else 0
+    """Fill the theme's label template. Only the five known {names} are replaced (no str.format:
+    LLM-written templates could otherwise pad to any width or reach Python internals)."""
+    pos = _clamp(pos, dur)
     laps = 4
-    lap = min(laps, int(laps * pos / dur) + 1) if pos and dur else 1
-    try:
-        return theme["progress"]["label"].format(pos=fmt(pos), dur=fmt(dur), pct=pct, lap=lap, laps=laps)
-    except (KeyError, IndexError, ValueError, AttributeError, TypeError):  # LLM-written templates
+    vals = {"pos": fmt(pos), "dur": fmt(dur), "pct": int(100 * pos / dur) if dur else 0,
+            "lap": min(laps, int(laps * pos / dur) + 1) if dur else 1, "laps": laps}
+    out = re.sub(r"\{(\w+)\}", lambda m: str(vals.get(m.group(1), m.group(0))), theme["progress"]["label"])
+    if "{" in out or "}" in out:
         return f"{fmt(pos)} / {fmt(dur)}"
+    return out[:30]
 
 
 def progress_bar(theme, width, pos, dur):
@@ -226,5 +242,5 @@ def progress_bar(theme, width, pos, dur):
     full, empty, _ = PROGRESS[theme["progress"]["style"]]
     cursor = theme["progress"]["cursor"]
     width = max(4, width - len(cursor))
-    filled = int(width * pos / dur) if pos and dur else 0
+    filled = int(width * _clamp(pos, dur) / dur) if dur else 0
     return full * filled, cursor, empty * (width - filled)

@@ -1,0 +1,27 @@
+{
+ "why": "`remove 0` passes index -1 to the player (int(arg) - 1 with no lower bound), so it targets the last song (and real mpv answers with a raw error) instead of being rejected.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  },
+  {
+   "id": "bbbbbbbbbbb",
+   "title": "Two",
+   "artist": "A"
+  },
+  {
+   "id": "ccccccccccc",
+   "title": "Three",
+   "artist": "A"
+  }
+ ],
+ "steps": [
+  "remove 0",
+  "queue"
+ ],
+ "expect": [
+  "Three"
+ ]
+}

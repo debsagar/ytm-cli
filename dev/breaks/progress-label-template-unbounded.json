@@ -1,0 +1,21 @@
+{
+ "why": "progress_label passes the LLM's template straight to str.format, so format specs ('{pct:>40}') make an arbitrarily wide label that wraps the bar, and attribute access ('{pos.__class__}') prints Python internals.",
+ "theme": {
+  "name": "x",
+  "progress": {
+   "style": "dots",
+   "label": "{pct:>40}{pos.__class__}"
+  }
+ },
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "Song",
+   "artist": "A"
+  }
+ ],
+ "absent": [
+  "<class",
+  "                              15"
+ ]
+}

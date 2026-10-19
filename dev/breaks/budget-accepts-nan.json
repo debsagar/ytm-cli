@@ -1,0 +1,16 @@
+{
+ "why": "_valid allows float('nan') because nan < 0 is False; with budget_day = nan, allowance() never reports 'budget reached', so the spend cap is silently off.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "Song",
+   "artist": "A"
+  }
+ ],
+ "steps": [
+  "set budget_day nan"
+ ],
+ "absent": [
+  "= nan"
+ ]
+}

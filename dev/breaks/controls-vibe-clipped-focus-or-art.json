@@ -1,0 +1,34 @@
+[
+ {
+  "why": "Even with icon labels, each controls button is 5 cells (Btn padding 0 1 on top of Button's line-pad 1), so in the focus layout (#info is 80% wide) at 74x24 the vibe button is cut to 'norm'.",
+  "theme": "velvet",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "Song",
+    "artist": "A"
+   }
+  ],
+  "expect": [
+   "normal"
+  ]
+ },
+ {
+  "why": "Same controls row at 74x30 in classic: the art is shown (window >= 26 rows), #info is 48 wide, and the vibe button is clipped off completely.",
+  "theme": "dream haze",
+  "size": [
+   74,
+   30
+  ],
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "Song",
+    "artist": "A"
+   }
+  ],
+  "expect": [
+   "normal"
+  ]
+ }
+]

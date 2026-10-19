@@ -1,0 +1,14 @@
+{
+ "why": "A list inside can_change (e.g. [[\"colours\"]]) makes set(v) raise TypeError in settings._valid, which reload() doesn't catch, so the app can't start.",
+ "settings": "can_change = [[\"colours\"]]\n",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "Song",
+   "artist": "A"
+  }
+ ],
+ "expect": [
+  "vol 70%"
+ ]
+}

@@ -1,0 +1,26 @@
+{
+ "why": "A theme change that resizes the art without hiding it (classic -> hero at 130x40: 20 -> 40 cells) redraws the bar before layout, with the old #info width; nothing redraws it after, so a paused song's bar runs past the row and the label wraps to its own line.",
+ "theme": "dream haze",
+ "paused": true,
+ "size": [
+  130,
+  40
+ ],
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "Song",
+   "artist": "A"
+  }
+ ],
+ "steps": [
+  {
+   "click": "#theme",
+   "wait": 1
+  }
+ ],
+ "expect": [
+  "S O N G",
+  "···  0:30 / 3:20   vol 70%"
+ ]
+}

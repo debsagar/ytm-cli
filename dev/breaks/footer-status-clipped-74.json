@@ -1,0 +1,16 @@
+{
+ "why": "The footer key hints already fill ~68 of 74 columns, so the status after the mode ('budget reached', '$x today') is cut off at the real window size.",
+ "settings": {
+  "budget_day": "0"
+ },
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "Song",
+   "artist": "A"
+  }
+ ],
+ "expect": [
+  "budget reached"
+ ]
+}

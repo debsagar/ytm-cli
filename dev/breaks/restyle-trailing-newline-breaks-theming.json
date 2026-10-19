@@ -1,0 +1,15 @@
+{
+ "why": "RESTYLE uses `$`, which matches before a trailing newline, so restyle = \"10min\\n\" passes validation, then restyle_due does int('10m') and every theme change fails as 'brain offline'.",
+ "settings": "restyle = \"10min\\n\"\n",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "Song",
+   "artist": "A"
+  }
+ ],
+ "absent": [
+  "brain offline",
+  "invalid literal"
+ ]
+}
