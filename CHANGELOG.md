@@ -5,6 +5,7 @@ All notable changes to this project are documented here. Versions follow [Semant
 ## [Unreleased]
 
 ### Added
+- GitHub Actions CI (compile, ruff, break scenarios), CONTRIBUTING.md and issue/PR templates.
 - Settings in `%USERPROFILE%\.config\ytm\settings.toml`, picked up live when the file changes; `set` lists them, `set <key> <value>` changes one.
   - `mode` off · jev · yolo; `budget_day` and `budget_month`: LLM work pauses at 80% of a budget, Jev stops at 100%. Songs measured before keep their theme for free.
   - How fast the look changes: `restyle` (every song, every N songs, every N minutes, or pinned), `stickiness` (a new theme must fit clearly better before the look switches) and `can_change` (colours, motif, layout).

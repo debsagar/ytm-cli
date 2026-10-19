@@ -1,5 +1,7 @@
 ﻿# ytm
 
+[![CI](https://github.com/debsagar/ytm-cli/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/debsagar/ytm-cli/actions/workflows/ci.yml?query=branch%3Adev)
+
 A minimal-RAM YouTube Music player for the Windows terminal. Search, queue, start radio mixes, like songs, build playlists and replay your history from a small mini-player window: no browser, no login. The player restyles itself for each song.
 
 Under the hood it is a single audio-only [mpv](https://mpv.io) process fed by [yt-dlp](https://github.com/yt-dlp/yt-dlp), controlled by a small [Textual](https://textual.textualize.io) app. Together they use about 120 MB of RAM.
@@ -179,3 +181,7 @@ The classic commands:
 - Radio is capped at 100 tracks; uncapped mixes are ~700 entries and take about 20 s to start.
 - A pasted `watch?v=...&list=...` link plays only that one track; pure playlist and album URLs play in full.
 - Expect a few seconds' delay before the first track starts while yt-dlp resolves the stream.
+
+## Contributing
+
+Pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
