@@ -9,7 +9,7 @@ import re
 import sys
 
 from . import brain, library, settings
-from .search import Track, _api, _track
+from .search import _api, _track
 
 LIST_RE = re.compile(r"[?&]list=([\w-]+)")
 

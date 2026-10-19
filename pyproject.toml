@@ -1,0 +1,10 @@
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# Only real-bug rules (syntax errors, unused/undefined names); no style enforcement.
+select = ["E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# TODO: drop the f prefix (and un-double the braces) on the two CSS strings in HelpScreen and PlaylistPicker, then remove this.
+"ytm/app.py" = ["F541"]
