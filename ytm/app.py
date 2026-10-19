@@ -357,7 +357,7 @@ class YtmApp(App):
     Screen.tight #footer {{ margin: 0; }}
     """
     BINDINGS = [
-        Binding("ctrl+space", "pause", priority=True),
+        Binding("ctrl+space,ctrl+@", "pause", priority=True),  # Windows Terminal sends Ctrl+Space as NUL: ctrl+@
         Binding("ctrl+n", "next", priority=True),
         Binding("ctrl+b", "prev", priority=True),
         Binding("ctrl+right", "seek(10)", priority=True),

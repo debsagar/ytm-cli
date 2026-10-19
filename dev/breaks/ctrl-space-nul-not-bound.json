@@ -1,0 +1,6 @@
+{
+ "why": "Windows Terminal sends Ctrl+Space as NUL (0x00), which Textual's parser names 'ctrl+@' (keys.py: ControlAt, 'Also Control-Space'). Its alias table only maps 'ctrl+at', so the 'ctrl+space' binding never matches and the advertised pause hotkey does nothing. The same key as 'ctrl+space' pauses.",
+ "songs": [{"id": "aaaaaaaaaaa", "title": "Song", "artist": "A"}],
+ "steps": [{"key": "ctrl+@"}],
+ "expect": ["▶   ⏭"]
+}
