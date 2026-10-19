@@ -30,7 +30,7 @@ def main():
     except FileNotFoundError:
         r = subprocess.CompletedProcess([], 1, "", "uv not found")
     if r.returncode:
-        print("code updated, but installing packages failed (close ytm, then run ytm update again):",
+        print("code updated, but installing packages failed (fix that, then run ytm update again):",
               r.stderr.strip() or r.stdout.strip())
         return 1
     version = re.search(r'__version__ = "(.+?)"', (ROOT / "ytm" / "__init__.py").read_text(encoding="utf-8"))
