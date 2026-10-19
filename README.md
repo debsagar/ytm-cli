@@ -113,6 +113,10 @@ Type `set` to see every setting and `set <key> <value>` to change one (`mode off
 | `grow_themes`, `max_new_themes_week` | `auto`, `3` | Whether and how often the LLM may write new themes |
 | `llm_model` | `anthropic/claude-haiku-5.5` | Any [OpenRouter](https://openrouter.ai/models) model id (`vendor/name`) that supports JSON output, used to write themes. Reasoning is switched off for the call; if the response has no cost, the logged price is estimated at Haiku rates and marked `estimated` |
 
+### Updating
+
+`ytm update` moves your copy to the latest release and installs any new Python packages. Your library, history and settings live outside the code and are not touched. If you've edited files in that folder, git refuses and nothing changes.
+
 ## Classic commands
 
 The original one-shot commands still work and start mpv directly in the terminal.
