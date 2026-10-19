@@ -1,0 +1,7 @@
+{
+ "why": "▦ / `layout classic` is stored in theme_spec, but the next song's show_song_theme restyles (restyle=song, can_change includes layout by default), even to the same theme name, so the user's layout pick silently reverts to the theme's layout (stage here: the 3-row equaliser comes back).",
+ "theme": "neon rave",
+ "songs": [{"id": "aaaaaaaaaaa", "title": "One", "artist": "A"}, {"id": "bbbbbbbbbbb", "title": "Two", "artist": "B"}],
+ "steps": ["layout classic", {"key": "ctrl+n", "wait": 1}],
+ "absent": ["████████████"]
+}

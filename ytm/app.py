@@ -407,6 +407,7 @@ class YtmApp(App):
         self.song_feats = {}       # features of the song playing (headline, blurb...)
         self._played = None        # (video id, last position, duration) for skip logging
         self._unplayed = None      # a song loaded paused (resume): not a play until it plays
+        self._picked = set()       # parts of the look the user picked (layout, colours): restyles keep them
         self.layout = "classic"     # the layout on screen (the theme's, if the window fits it)
         self._log = []              # recent messages, shown in the dashboard's ask panel
         self._said = -math.inf      # when the user last got a reply (automatic notes wait 5 s after it)
@@ -614,6 +615,7 @@ class YtmApp(App):
             return
         self.vibe = "normal"  # calm and loud force their own layout
         self.theme_spec = {**self.theme_spec, "layout": name}
+        self._picked.add("layout")  # sticks for the session: the next song's restyle keeps it
         self.apply_theme()
         self.lib.log("layout", self.current_id() or "", to=name)
         small = "" if self.layout == name else f" · needs {DASH_MIN[0]}x{DASH_MIN[1]}, showing {self.layout} for now"
@@ -687,9 +689,11 @@ class YtmApp(App):
                 return "sticky"
         return None
 
-    def restyle(self, spec):
-        """Switch to a theme, changing only the parts the can_change setting allows."""
-        new, cur, allowed = theme.normalize(spec), self.theme_spec, self.settings["can_change"]
+    def restyle(self, spec, manual=False):
+        """Switch to a theme, changing only the parts the can_change setting allows
+        and, unless the user is the one switching, none they picked this session."""
+        new, cur = theme.normalize(spec), self.theme_spec
+        allowed = [x for x in self.settings["can_change"] if manual or x not in self._picked]
         if "colours" not in allowed:
             new["palette"] = cur["palette"]
         if "motif" not in allowed:
@@ -1161,7 +1165,8 @@ class YtmApp(App):
             names = [t["name"] for t in brain.all_themes(self.lib)]
             cur = self.theme_spec["name"]
             nxt = names[(names.index(cur) + 1) % len(names)] if cur in names else names[0]
-            self.restyle(self.theme_named(nxt))
+            self.restyle(self.theme_named(nxt), manual=True)
+            self._picked.add("colours")
             self.lib.log("theme_cycle", self.current_id() or "", to=nxt)
             self.say(f"◐ {escape(nxt)}")
         elif bid == "layout":  # instant: next layout that fits the window
