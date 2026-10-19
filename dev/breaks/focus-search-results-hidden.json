@@ -1,0 +1,26 @@
+{
+ "why": "In the focus layout (vibe calm, or the velvet/campfire/rainy window themes) #library is display:none, but do_search still shows the results there and focuses the hidden #list. The user sees no results, and the next letters they type go to the hidden list as hotkeys: typing 'lofi' likes the first result ('l'), and 's'/'d' would open the picker or remove. Decided: when results arrive and the list is hidden, switch to classic (an explicit switch, like ▦) so they show, then focus the list as usual.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "Song",
+   "artist": "A"
+  }
+ ],
+ "results": [
+  {
+   "id": "rrrrrrrrrrr",
+   "title": "ResultOne",
+   "artist": "R"
+  }
+ ],
+ "steps": [
+  "vibe calm",
+  "search foo"
+ ],
+ "expect": [
+  "ResultOne",
+  "▦ classic, to show results"
+ ],
+ "absent": []
+}

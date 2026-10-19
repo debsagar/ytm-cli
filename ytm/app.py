@@ -1011,9 +1011,7 @@ class YtmApp(App):
             top = results[0]
             if action == "search":
                 self.results = results
-                self.call_from_thread(self.show, "results")
-                self.call_from_thread(self.say, "")
-                self.call_from_thread(self.query_one("#list").focus)
+                self.call_from_thread(self.show_results)
             elif action == "radio":
                 tracks = context.rerank(self.lib, search.radio(top.video_id) or [top], seed=top.video_id)
                 self.call_from_thread(self.play_tracks, tracks, True)
@@ -1025,6 +1023,15 @@ class YtmApp(App):
                 self.call_from_thread(self.say, f"{verb} · {escape(top.label)}")
         except Exception as e:  # network errors etc. should not kill the app
             self.call_from_thread(self.say, f"[{C['red']}]error: {escape(str(e))}[/]")
+
+    def show_results(self):
+        self.show("results")
+        if not self.query_one("#library").display:  # the focus layout hides the list: never focus it hidden
+            self.pick_layout("classic")
+            self.say("▦ classic, to show results")
+        else:
+            self.say("")
+        self.call_after_refresh(self.query_one("#list").focus)
 
     # ---- likes & playlists ----
     def like(self, t: Track):
