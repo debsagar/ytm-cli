@@ -10,6 +10,7 @@ All notable changes to this project are documented here. Versions follow [Semant
   - How fast the look changes: `restyle` (every song, every N songs, every N minutes, or pinned), `stickiness` (a new theme must fit clearly better before the look switches) and `can_change` (colours, motif, layout).
   - `motion` (full, low, off), `grow_themes` and `max_new_themes_week` for the LLM.
   - Every change is logged as an event.
+  - `llm_model` picks the OpenRouter model that writes themes. Theme calls now turn reasoning off and cap output at 600 tokens, about a third cheaper per theme.
 - The help popup scrolls when the window is short.
 - Cost tracking: every Jev and LLM call is logged with its tokens and price. The footer shows today's spend, and `cost` breaks it down by today, this month and all time.
 

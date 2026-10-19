@@ -20,7 +20,7 @@ from . import settings, theme
 SECRETS = Path.home() / ".config" / "ytm" / "secrets.env"
 JEV_URL = "https://api.typesafe.ai/v1/systemone"
 LLM_URL = "https://openrouter.ai/api/v1/chat/completions"
-LLM_MODEL = "anthropic/claude-haiku-5.5"
+LLM_MODEL = "anthropic/claude-haiku-5.5"  # default of the llm_model setting
 
 # Tuned on 84 real songs after refine(): distance median 0.51, p90 0.70.
 OUTLIER = 0.6       # distance beyond which a song doesn't belong to any theme
@@ -57,10 +57,11 @@ def _post(url, key, body, timeout=20):
         return json.loads(r.read())
 
 
-def _spend(lib, api, tokens_in, tokens_out, usd, video_id=""):
+def _spend(lib, api, tokens_in, tokens_out, usd, video_id="", estimated=False):
     """Every paid call becomes a 'cost' event, so the UI and the budget cap can add them up."""
     if lib:
-        lib.log("cost", video_id, api=api, tokens_in=tokens_in, tokens_out=tokens_out, usd=usd)
+        extra = {"estimated": True} if estimated else {}
+        lib.log("cost", video_id, api=api, tokens_in=tokens_in, tokens_out=tokens_out, usd=usd, **extra)
 
 
 def budget(lib, s):
@@ -160,20 +161,24 @@ Return ONLY a JSON object:
 Keep text readable: bg/panel dark, text light, accent vivid."""
 
 
-def write_theme(songs, profile, existing, lib=None):
+def write_theme(songs, profile, existing, lib=None, model=None):
     if not _key("OPENROUTER_API_KEY"):
         return None
     prompt = WRITER_PROMPT.format(songs=json.dumps(songs), profile=json.dumps(profile),
                                   existing=", ".join(existing), motifs=list(theme.MOTIFS),
                                   styles=list(theme.PROGRESS))
     r = _post(LLM_URL, _key("OPENROUTER_API_KEY"), {
-        "model": LLM_MODEL, "max_tokens": 2000, "response_format": {"type": "json_object"},
+        "model": model or settings.Settings()["llm_model"], "max_tokens": 600,  # the JSON is ~250 tokens
+        "reasoning": {"effort": "none"},  # hidden reasoning is billed as output and tripled the cost
+        "response_format": {"type": "json_object"},
         "usage": {"include": True},  # ask OpenRouter to report the cost
         "messages": [{"role": "user", "content": prompt}]}, timeout=40)
     u = r.get("usage", {})
     tin, tout = u.get("prompt_tokens", 0), u.get("completion_tokens", 0)
-    _spend(lib, "llm", tin, tout, u.get("cost", tin * LLM_IN + tout * LLM_OUT))
-    text = r["choices"][0]["message"].get("content") or ""  # empty if reasoning used up max_tokens
+    cost = u.get("cost")  # missing: estimate from Haiku prices, which are wrong for other models
+    _spend(lib, "llm", tin, tout, cost if cost is not None else tin * LLM_IN + tout * LLM_OUT,
+           estimated=cost is None)
+    text = r["choices"][0]["message"].get("content") or ""  # empty if the model ran out of max_tokens
     if "{" not in text:
         return None
     return theme.normalize(json.loads(text[text.find("{"):text.rfind("}") + 1]))
