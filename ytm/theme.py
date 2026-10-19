@@ -107,8 +107,6 @@ PRESETS = [
     _t("rainy window", "sad, melancholic, late-night songs", {"energy": .25, "mood": {"melancholic": 1}, "tags": []},
        "#10151c", "#0b0f14", "#7aa2c7", "#b8c7d9", "#e3ebf3", "#5d6b7a", "rain", "thin", layout="focus"),
 ]
-# The neutral look before anything plays (not a cluster).
-DEFAULT_NAME = DEFAULT["name"]
 
 
 def _hex(c, fallback):

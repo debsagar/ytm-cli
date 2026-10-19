@@ -398,7 +398,7 @@ def resume(lib):
     """{id, at} when the last session ended mid-song: from the quit event, or from a skip
     if that was the last thing that happened. None otherwise."""
     row = lib._q("SELECT type, id, json_extract(data,'$.at'), json_extract(data,'$.dur') FROM events "
-                 "WHERE type IN ('play','skip','finish','quit') ORDER BY at DESC LIMIT 1")
+                 "WHERE type IN ('play','skip','finish','quit') ORDER BY at DESC, rowid DESC LIMIT 1")
     typ, vid, at, dur = row[0] if row else (None,) * 4
     if typ in ("quit", "skip") and vid and at and dur and at < dur - 15:
         return {"id": vid, "at": int(at)}

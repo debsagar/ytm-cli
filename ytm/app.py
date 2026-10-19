@@ -21,7 +21,8 @@ from . import art, brain, context, library, search, settings, theme  # noqa: E40
 from .player import Player  # noqa: E402
 from .search import Track  # noqa: E402
 
-# Catppuccin Mocha palette, used directly so colours never depend on the terminal theme.
+# The colours CSS ($ytm-*) and markup use, so they never depend on the terminal theme.
+# Catppuccin Mocha until the first theme; apply_theme then fills it from theme.colors().
 C = dict(
     crust="#11111b", mantle="#181825", base="#1e1e2e", s0="#313244", s1="#45475a",
     dim="#6c7086", sub="#a6adc8", text="#cdd6f4",
@@ -63,13 +64,6 @@ HELP_ROWS = [
     ("← →", "switch list tabs"),
     ("Ctrl+Space · Ctrl+N · Ctrl+B", "pause · next · previous"),
 ]
-
-
-def fmt_time(s):
-    if s is None:
-        return "-:--"
-    s = int(s)
-    return f"{s // 60}:{s % 60:02d}"
 
 
 def clean(title):
@@ -117,7 +111,7 @@ def songs(n):
 
 # commands that need an argument; bare, they show this instead of searching YouTube for the word
 USAGE = {"play": "play <song>", "radio": "radio <song>", "save": "save <playlist name>",
-         "vol": "vol <0-130>", "volume": "vol <0-130>", "remove": "remove <number in the queue>",
+         "vol": "vol <0-100>", "volume": "vol <0-100>", "remove": "remove <number in the queue>",
          "rm": "remove <number in the queue>", "search": "search <song>", "s": "search <song>"}
 
 
@@ -154,11 +148,11 @@ class PlaylistRow(ListItem):
 class HelpScreen(ModalScreen):
     """A popup of text lines: the help, or the settings list."""
     BINDINGS = [Binding("escape,question_mark,q,enter", "dismiss")]
-    CSS = f"""
-    HelpScreen {{ align: center middle; background: $ytm-crust 70%; }}
-    #help {{ width: 72; max-width: 100%; height: auto; max-height: 100%; background: $ytm-mantle;
+    CSS = """
+    HelpScreen { align: center middle; background: $ytm-crust 70%; }
+    #help { width: 72; max-width: 100%; height: auto; max-height: 100%; background: $ytm-mantle;
              border: round $ytm-mauve; padding: 1 1; border-title-color: $ytm-mauve;
-             scrollbar-size-vertical: 1; scrollbar-color: $ytm-mauve; scrollbar-background: $ytm-mantle; }}
+             scrollbar-size-vertical: 1; scrollbar-color: $ytm-mauve; scrollbar-background: $ytm-mantle; }
     """
 
     def __init__(self, lines=None, title="how to use ytm"):
@@ -177,14 +171,14 @@ class HelpScreen(ModalScreen):
 class PlaylistPicker(ModalScreen):
     """Pick an existing playlist or type a new name. Dismisses with the name, or None."""
     BINDINGS = [Binding("escape", "dismiss(None)")]
-    CSS = f"""
-    PlaylistPicker {{ align: center middle; background: $ytm-crust 70%; }}
-    #box {{ width: 50; height: auto; max-height: 20; background: $ytm-mantle;
-            border: round $ytm-mauve; padding: 1 2; border-title-color: $ytm-mauve; }}
-    #pl {{ height: auto; max-height: 10; background: $ytm-mantle; }}
-    #pl > ListItem.-highlight {{ background: $ytm-s0; }}
-    #name {{ margin-top: 1; border: round $ytm-s1; background: $ytm-base; }}
-    #name:focus {{ border: round $ytm-mauve; }}
+    CSS = """
+    PlaylistPicker { align: center middle; background: $ytm-crust 70%; }
+    #box { width: 50; height: auto; max-height: 20; background: $ytm-mantle;
+            border: round $ytm-mauve; padding: 1 2; border-title-color: $ytm-mauve; }
+    #pl { height: auto; max-height: 10; background: $ytm-mantle; }
+    #pl > ListItem.-highlight { background: $ytm-s0; }
+    #name { margin-top: 1; border: round $ytm-s1; background: $ytm-base; }
+    #name:focus { border: round $ytm-mauve; }
     """
 
     def __init__(self, playlists, what):
@@ -425,7 +419,7 @@ class YtmApp(App):
             try:
                 self.player.command("set_property", "pause", True)
                 self.player.command("loadfile", t.url, "replace", -1, f"start={r['at']}")  # mpv ≥ 0.38
-                note = f"resume · {escape(s['title'])} at {fmt_time(r['at'])} · press ⏯"
+                note = f"resume · {escape(s['title'])} at {theme.fmt(r['at'])} · press ⏯"
                 self.set_timer(2, lambda: self.say(note))  # shortcut: after the song's theme note, not ordered
             except RuntimeError:
                 pass
@@ -565,11 +559,8 @@ class YtmApp(App):
         self.lib.log("vibe", self.current_id() or "", to=self.vibe)
         self.say(f"vibe {self.vibe}")
 
-    def library_themes(self):
-        return theme.PRESETS + self.lib.themes()
-
     def theme_named(self, name):
-        return next((t for t in self.library_themes() if t["name"] == name), theme.DEFAULT)
+        return next((t for t in brain.all_themes(self.lib) if t["name"] == name), theme.DEFAULT)
 
     def song_dict(self, vid):
         t = self.known.get(vid)
@@ -655,7 +646,7 @@ class YtmApp(App):
         self.think(vid, nxt.group(1) if nxt else None)
 
     def tick(self):
-        """4x a second: scroll the motif, move the equaliser, keep art visibility right."""
+        """4x a second: re-read settings (every 2 s), re-fit the layout, scroll the motif, move the equalisers."""
         if not self.is_running:
             return  # shutting down: the widgets are already being removed
         self._ticks += 1
@@ -952,7 +943,7 @@ class YtmApp(App):
         def done(name):
             if name:
                 n = self.lib.add_to_playlist(name, [tidy(t) for t in tracks])
-                self.say(f"≡ added {n} song{'s' * (n != 1)} to {escape(name)}")
+                self.say(f"≡ added {songs(n)} to {escape(name)}")
                 if self.view in ("playlists", "playlist"):
                     self.fill_list()
         self.push_screen(PlaylistPicker(self.lib.playlists(), what), done)
@@ -1060,7 +1051,7 @@ class YtmApp(App):
         elif bid == "auto":
             self.toggle_auto()
         elif bid == "theme":  # instant: cycle through every theme in the library
-            names = [t["name"] for t in self.library_themes()]
+            names = [t["name"] for t in brain.all_themes(self.lib)]
             cur = self.theme_spec["name"]
             nxt = names[(names.index(cur) + 1) % len(names)] if cur in names else names[0]
             self.restyle(self.theme_named(nxt))
