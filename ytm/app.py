@@ -179,6 +179,18 @@ class YtmApp(App):
     #info {{ height: auto; }}
     #title {{ color: $ytm-pink; text-style: bold; }}
     #motif {{ color: $ytm-mauve; height: 1; }}
+    #eq {{ color: $ytm-mauve; height: 3; display: none; }}
+    Screen.layout-stage #eq {{ display: block; }}
+    Screen.layout-stage #art {{ display: none; }}
+    Screen.layout-hero #art {{ width: {ART_W * 2}; height: {ART_H * 2}; margin-right: 3; }}
+    Screen.layout-hero #title {{ margin-top: 1; }}
+    Screen.layout-hero #list {{ max-height: 12; }}
+    Screen.layout-focus #art, Screen.layout-focus #tabs, Screen.layout-focus #actions,
+    Screen.layout-focus #list {{ display: none; }}
+    Screen.layout-focus #now {{ height: 1fr; align: center middle; }}
+    Screen.layout-focus #info {{ width: 80%; }}
+    Screen.layout-focus #title {{ text-align: center; }}
+    Screen.layout-focus #artist, Screen.layout-focus #headline, Screen.layout-focus #motif {{ text-align: center; }}
     #headline {{ color: $ytm-mauve; text-style: italic; height: auto; }}
     #artist {{ color: $ytm-sub; }}
     #bar {{ margin-top: 1; }}
@@ -252,12 +264,15 @@ class YtmApp(App):
         self.theme_spec = theme.normalize(theme.DEFAULT)
         self.song_feats = {}       # features of the song playing (headline, blurb...)
         self._played = None        # (video id, last position, duration) for skip logging
+        self.layout = "classic"
+        self._phase = 0.0           # animation clock, advances only while playing
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="now"):
             yield Static("", id="art")
             with Vertical(id="info"):
                 yield Static(id="motif")
+                yield Static(id="eq")
                 yield Static(id="title")
                 yield Static(id="artist")
                 yield Static(id="headline")
@@ -292,6 +307,7 @@ class YtmApp(App):
         self.render_now()
         self.render_controls()
         self.query_one("#art").update(self.empty_art())
+        self.set_interval(0.25, self.tick)
         self.query_one("#prompt").focus()
 
     def on_unmount(self):
@@ -299,7 +315,6 @@ class YtmApp(App):
             self.player.close()
 
     def on_resize(self, event):
-        self.query_one("#art").display = self.size.width >= 70 and self.size.height >= 26
         self.render_now()
 
     def on_descendant_focus(self):
@@ -343,6 +358,12 @@ class YtmApp(App):
             self.theme_spec = theme.normalize(spec)
         t = theme.apply_vibe(self.theme_spec, self.vibe)
         C.update(theme.colors(t))
+        if t["layout"] != self.layout:
+            self.layout = t["layout"]
+            self._art_id = None  # art size depends on layout: fetch again
+            self.update_art()
+        for name in theme.LAYOUTS:
+            self.screen.set_class(name == self.layout, f"layout-{name}")
         self.refresh_css()
         self.fill_list()
         self.render_footer()
@@ -402,6 +423,19 @@ class YtmApp(App):
         nxt = VID_RE.search(entries[pos + 1].get("filename", "")) if pos + 1 < len(entries) else None
         self.think(vid, nxt.group(1) if nxt else None)
 
+    def tick(self):
+        """4x a second: scroll the motif, move the equaliser, keep art visibility right."""
+        if not self.state["pause"] and self.state["time-pos"] is not None:
+            self._phase += 0.25
+        t = theme.apply_vibe(self.theme_spec, self.vibe)
+        width = self.query_one("#info").content_size.width
+        self.query_one("#motif").update(escape(theme.motif_line(t, width, int(self._phase * 2))))
+        if self.layout == "stage":
+            energy = self.song_feats.get("energy", 0.5)
+            self.query_one("#eq").update(theme.equaliser(width, 3, self._phase, energy))
+        roomy = self.size.width >= 70 and self.size.height >= 26
+        self.query_one("#art").styles.display = "block" if roomy and self.layout in ("classic", "hero") else "none"
+
     # ---- the song that's playing ----
     def current_id(self):
         pos = self.state["playlist-pos"]
@@ -431,7 +465,8 @@ class YtmApp(App):
 
     @work(thread=True, exclusive=True, group="art")
     def load_art(self, vid):
-        img = art.fetch(vid, ART_W, ART_H)
+        big = self.layout == "hero"
+        img = art.fetch(vid, ART_W * (2 if big else 1), ART_H * (2 if big else 1))
         if img is not None and vid == self._art_id:
             self.call_from_thread(self.query_one("#art").update, img)
 
@@ -444,11 +479,10 @@ class YtmApp(App):
             title, artist = split_label(s["media-title"])
         else:
             title, artist = "Nothing playing", "search for a song below to start"
-        self.query_one("#title").update(escape(title))
-        self.query_one("#artist").update(escape(artist))
         t = theme.apply_vibe(self.theme_spec, self.vibe)
+        self.query_one("#title").update(escape(theme.spaced(title) if t["layout"] == "hero" else title))
+        self.query_one("#artist").update(escape(artist))
         width = self.query_one("#info").content_size.width
-        self.query_one("#motif").update(escape(theme.motif_line(t, width)))
         f = self.song_feats
         line = " — ".join(x for x in (f.get("headline"), f.get("blurb") if self.vibe != "calm" else "") if x)
         self.query_one("#headline").update(escape(line))
