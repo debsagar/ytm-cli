@@ -11,10 +11,11 @@ Keys come from ~/.config/ytm/secrets.env (outside the repo) or the environment."
 import json
 import math
 import os
+import time
 import urllib.request
 from pathlib import Path
 
-from . import theme
+from . import settings, theme
 
 SECRETS = Path.home() / ".config" / "ytm" / "secrets.env"
 JEV_URL = "https://api.typesafe.ai/v1/systemone"
@@ -26,6 +27,7 @@ OUTLIER = 0.6       # distance beyond which a song doesn't belong to any theme
 GROUP = 0.5         # how close outliers must be to each other to form a new cluster
 MIN_CLUSTER = 3     # outliers needed before a new theme is written
 MAX_THEMES = 24
+STICKY = 1.0        # margin at stickiness 1. On 84 songs: 0 -> look changes every 1.2 songs, 0.5 -> 2.7, 1 -> 12
 
 # $ per token. Jev bills input only. OpenRouter usually reports the exact cost itself;
 # the Haiku price is the fallback when it doesn't.
@@ -59,6 +61,18 @@ def _spend(lib, api, tokens_in, tokens_out, usd, video_id=""):
     """Every paid call becomes a 'cost' event, so the UI and the budget cap can add them up."""
     if lib:
         lib.log("cost", video_id, api=api, tokens_in=tokens_in, tokens_out=tokens_out, usd=usd)
+
+
+def budget(lib, s):
+    """(jev allowed, llm allowed, reason when something is off) given the settings
+    and what has been spent so far today, this month and on themes this week."""
+    total = lambda since: sum(usd for _, usd in lib.spend(since).values())
+    jev, llm, why = settings.allowance(s, total(settings.start_of("today")), total(settings.start_of("month")))
+    if not enabled():
+        return False, False, "no TypeSafe key"
+    if llm and lib.themes_since(time.time() - 7 * 86400) >= s["max_new_themes_week"]:
+        llm, why = False, "weekly theme cap reached"
+    return jev, llm, why
 
 
 # ---- Jev: measure the song (one request, all questions in parallel) ----
@@ -216,9 +230,9 @@ def describe(vs):
     return {"energy_0_to_1": round(mean[0] / 2, 2), "top_moods": {m: round(p, 2) for m, p in moods}, "tags": tags}
 
 
-def think(song, lib):
-    """Measure a song (cached), assign it to a theme, grow the library if a new
-    cluster has formed. Returns the song's features, including 'theme'."""
+def think(song, lib, llm=True):
+    """Measure a song (cached), assign it to a theme, and (if llm) grow the library
+    when a new cluster has formed. Returns the song's features, including 'theme'."""
     lib.remember(song["id"], song["title"], song["artist"])
     f = lib.features(song["id"])
     if not f or "mood_p" not in f:
@@ -226,7 +240,7 @@ def think(song, lib):
     themes = all_themes(lib)
     assign(f, themes)
     lib.save_features(song["id"], f)
-    new = grow(lib, themes) if f["dist"] > OUTLIER else None
+    new = grow(lib, themes) if llm and f["dist"] > OUTLIER else None
     if new:
         recluster(lib)
         f = lib.features(song["id"])

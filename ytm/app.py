@@ -1,9 +1,9 @@
 """The terminal UI (Textual): a compact mini-player. Run with:  python -m ytm"""
 
+import math
 import os
 import re
 import time
-from datetime import date
 
 # Windows Terminal supports 24-bit colour but doesn't always advertise it,
 # which makes Textual fall back to grey. Say so before Textual starts.
@@ -12,12 +12,12 @@ os.environ.setdefault("COLORTERM", "truecolor")
 from textual import on, work  # noqa: E402
 from textual.app import App, ComposeResult  # noqa: E402
 from textual.binding import Binding  # noqa: E402
-from textual.containers import Horizontal, Vertical  # noqa: E402
+from textual.containers import Horizontal, Vertical, VerticalScroll  # noqa: E402
 from textual.markup import escape  # noqa: E402
 from textual.screen import ModalScreen  # noqa: E402
 from textual.widgets import Button, Input, Label, ListItem, ListView, Static  # noqa: E402
 
-from . import art, brain, library, search, theme  # noqa: E402
+from . import art, brain, library, search, settings, theme  # noqa: E402
 from .player import Player  # noqa: E402
 from .search import Track  # noqa: E402
 
@@ -49,6 +49,8 @@ HELP_ROWS = [
     ("remove 3 · clear", "edit the queue"),
     ("auto", "toggle autoplay (keeps adding similar songs)"),
     ("cost", "what the brain has spent (Jev + LLM)"),
+    ("set · set <key> <value>", "see / change settings (restyle, budget…)"),
+    ("mode off · jev · yolo", "how much the brain may do"),
     ("quit", "exit (Ctrl+Q also works)"),
     ("", ""),
     ("Mouse", "every button and tab is clickable"),
@@ -98,12 +100,6 @@ def fmt_usd(usd):
     return f"{usd * 100:.3f}¢" if usd else "$0"
 
 
-def since(period):
-    """Unix time at the start of today or this month."""
-    d = date.today()
-    return time.mktime((d if period == "today" else d.replace(day=1)).timetuple())
-
-
 def keys(*pairs):
     """Footer hint: coloured key, grey description."""
     return "   ".join(f"[b {C['blue']}]{k}[/] [{C['dim']}]{d}[/]" for k, d in pairs)
@@ -135,18 +131,26 @@ class PlaylistRow(ListItem):
 
 
 class HelpScreen(ModalScreen):
+    """A popup of text lines: the help, or the settings list."""
     BINDINGS = [Binding("escape,question_mark,q,enter", "dismiss")]
     CSS = f"""
     HelpScreen {{ align: center middle; background: $ytm-crust 70%; }}
-    #help {{ width: 72; height: auto; background: $ytm-mantle; border: round $ytm-mauve;
-             padding: 1 2; border-title-color: $ytm-mauve; }}
+    #help {{ width: 72; max-width: 100%; height: auto; max-height: 100%; background: $ytm-mantle;
+             border: round $ytm-mauve; padding: 1 2; border-title-color: $ytm-mauve;
+             scrollbar-size-vertical: 1; scrollbar-color: $ytm-mauve; scrollbar-background: $ytm-mantle; }}
     """
 
+    def __init__(self, lines=None, title="how to use ytm"):
+        super().__init__()
+        self.lines = lines or [f"[b {C['blue']}]{escape(k):<30}[/][{C['sub']}]{d}[/]" if k else ""
+                               for k, d in HELP_ROWS]
+        self.title_ = title
+
     def compose(self):
-        lines = [f"[b {C['blue']}]{k:<30}[/][{C['sub']}]{d}[/]" if k else "" for k, d in HELP_ROWS]
-        w = Static("\n".join(lines) + f"\n\n[{C['dim']}]press Esc to close[/]", id="help")
-        w.border_title = "how to use ytm"
-        yield w
+        text = Static("\n".join(self.lines) + f"\n\n[{C['dim']}]↑↓ scroll · Esc closes[/]")
+        box = VerticalScroll(text, id="help")  # scrolls when the window is shorter than the text
+        box.border_title = self.title_
+        yield box
 
 
 class PlaylistPicker(ModalScreen):
@@ -275,6 +279,10 @@ class YtmApp(App):
         self._filling = False
         self._art_id = None
         self.lib = library.Library()
+        self.settings = settings.Settings()
+        self._ticks = 0
+        self._songs_since = 10 ** 6  # songs since the look last changed (huge: first song restyles)
+        self._restyled_at = 0.0
         self.vibe = "normal"
         self.theme_spec = theme.normalize(theme.DEFAULT)
         self.song_feats = {}       # features of the song playing (headline, blurb...)
@@ -400,17 +408,19 @@ class YtmApp(App):
 
     @work(thread=True, exclusive=True, group="brain")
     def think(self, vid, next_vid=None):
-        """Judge the current song (and prefetch the next one) on a worker thread."""
-        if not brain.enabled():
-            return
+        """Judge the current song (and prefetch the next one) on a worker thread.
+        Songs measured before cost nothing, so they keep their theme even with paid calls off."""
         try:
+            jev, llm, _ = brain.budget(self.lib, self.settings)
+            if not jev and not self.lib.features(vid):
+                return
             if not self.lib.features(vid):
                 self.call_from_thread(self.say, "✦ reading the song …")
-            feats = brain.think(self.song_dict(vid), self.lib)
+            feats = brain.think(self.song_dict(vid), self.lib, llm)
             if vid == self.current_id():
                 self.call_from_thread(self.show_song_theme, feats)
-            if next_vid and not self.lib.features(next_vid):
-                brain.think(self.song_dict(next_vid), self.lib)  # ready before the song starts
+            if jev and next_vid and not self.lib.features(next_vid):
+                brain.think(self.song_dict(next_vid), self.lib, llm)  # ready before the song starts
         except Exception as e:  # network/API trouble: keep the current look
             self.call_from_thread(self.say, f"brain offline: {escape(str(e))[:60]}")
         finally:
@@ -420,8 +430,38 @@ class YtmApp(App):
         self.song_feats = feats
         tags = " · ".join(feats.get("tags", []))
         note = f"{feats['theme']} · {feats['mood']} · energy {int(feats['energy'] * 100)}%" + (f" · {tags}" if tags else "")
+        kept = self.keep_look(feats)
+        if kept:
+            note += f" · kept {self.theme_spec['name']} ({kept})"
+        else:
+            self.restyle(self.theme_named(feats["theme"]))
         self.say((f"✦ new theme grown from {brain.MIN_CLUSTER}+ similar songs · " if feats.get("new_theme") else "") + escape(note))
-        self.apply_theme(self.theme_named(feats["theme"]))
+
+    def keep_look(self, feats):
+        """Why the current look stays (the restyle schedule, or stickiness), or None to switch."""
+        s = self.settings
+        if feats["theme"] == self.theme_spec["name"]:
+            return None
+        if not settings.restyle_due(s["restyle"], self._songs_since, time.time() - self._restyled_at):
+            return s["restyle"]
+        cur = next((t for t in brain.all_themes(self.lib) if t["name"] == self.theme_spec["name"]), None)
+        if cur:  # hysteresis: the new theme must fit clearly better, not just slightly
+            gain = math.dist(brain.song_vec(feats), brain.theme_vec(cur)) - feats["dist"]
+            if gain < s["stickiness"] * brain.STICKY:
+                return "sticky"
+        return None
+
+    def restyle(self, spec):
+        """Switch to a theme, changing only the parts the can_change setting allows."""
+        new, cur, allowed = theme.normalize(spec), self.theme_spec, self.settings["can_change"]
+        if "colours" not in allowed:
+            new["palette"] = cur["palette"]
+        if "motif" not in allowed:
+            new["motif"], new["progress"] = cur["motif"], cur["progress"]
+        if "layout" not in allowed:
+            new["layout"] = cur["layout"]
+        self._songs_since, self._restyled_at = 0, time.time()
+        self.apply_theme(new)
 
     def song_changed(self):
         """Log the play/skip of the previous song, then theme the new one."""
@@ -435,6 +475,7 @@ class YtmApp(App):
         if not vid:
             return
         self.lib.log("play", vid)
+        self._songs_since += 1
         entries = self.player.playlist()
         pos = self.state["playlist-pos"] or 0
         nxt = VID_RE.search(entries[pos + 1].get("filename", "")) if pos + 1 < len(entries) else None
@@ -442,16 +483,23 @@ class YtmApp(App):
 
     def tick(self):
         """4x a second: scroll the motif, move the equaliser, keep art visibility right."""
-        if not self.state["pause"] and self.state["time-pos"] is not None:
+        self._ticks += 1
+        if self._ticks % 8 == 0 and self.settings.reload():  # every 2 s: pick up hand edits
+            self.say(escape(self.settings.error) if self.settings.error else "⚙ settings reloaded")
+            self.render_footer()
+        roomy = self.size.width >= 70 and self.size.height >= 26
+        self.query_one("#art").styles.display = "block" if roomy and self.layout != "focus" else "none"
+        motion = self.settings["motion"]
+        if not self.state["pause"] and self.state["time-pos"] is not None and motion != "off":
             self._phase += 0.25
+        if motion == "low" and self._ticks % 4:
+            return  # 1 frame a second
         t = theme.apply_vibe(self.theme_spec, self.vibe)
         width = self.query_one("#info").content_size.width
         self.query_one("#motif").update(escape(theme.motif_line(t, width, int(self._phase * 2))))
         if self.layout == "stage":
             energy = self.song_feats.get("energy", 0.5)
             self.query_one("#eq").update(theme.equaliser(width, 3, self._phase, energy))
-        roomy = self.size.width >= 70 and self.size.height >= 26
-        self.query_one("#art").styles.display = "block" if roomy and self.layout != "focus" else "none"
 
     # ---- the song that's playing ----
     def current_id(self):
@@ -552,17 +600,38 @@ class YtmApp(App):
                         ("d", "remove"), ("←→", "tabs"), ("esc", "back"))
         else:
             hint = keys(("enter", "search"), ("tab", "list"), ("^space", "pause"), ("^n", "next"), ("?", "help"))
-        today = sum(usd for _, usd in self.lib.spend(since("today")).values())
-        if today:
-            hint += f"   [{C['dim']}]{fmt_usd(today)} today[/]"
+        _, _, why = brain.budget(self.lib, self.settings)
+        today = sum(usd for _, usd in self.lib.spend(settings.start_of("today")).values())
+        why = None if why == "mode off" else why
+        status = " · ".join(x for x in (self.settings["mode"], why, today and f"{fmt_usd(today)} today") if x)
+        hint += f"   [{C['dim']}]{escape(status)}[/]"
         self.query_one("#footer").update(hint)
+
+    def change_setting(self, cmd, arg):
+        """`set` lists settings, `set key value` changes one, `mode x` = `set mode x`."""
+        key, _, value = (f"mode {arg}" if cmd == "mode" else arg).partition(" ")
+        if not key or not value:
+            lines = []
+            for k, (_, _, why) in settings.SPEC.items():
+                v = settings._toml(self.settings[k])
+                lines += [f"[b {C['blue']}]{k}[/] = [{C['text']}]{escape(v)}[/]", f"  [{C['dim']}]{escape(why)}[/]"]
+            self.push_screen(HelpScreen(lines + ["", f"[{C['sub']}]change one: set <key> <value>[/]"], "settings"))
+            return
+        try:
+            v = self.settings.set(key, value)
+        except ValueError as e:
+            self.say(escape(str(e)))
+            return
+        self.lib.log("setting", "", key=key, to=v)
+        self.say(f"⚙ {escape(key)} = {escape(settings._toml(v))}")
+        self.render_footer()
 
     def cost_report(self):
         def line(period, s):
             calls = " · ".join(f"{n} {api}" for api, (n, _) in sorted(s.items())) or "no calls"
             return f"{period} {fmt_usd(sum(u for _, u in s.values()))} ({calls})"
         self.say(escape(" · ".join(line(p, self.lib.spend(t)) for p, t in
-                                   (("today", since("today")), ("month", since("month")), ("all", 0)))))
+                                   (("today", settings.start_of("today")), ("month", settings.start_of("month")), ("all", 0)))))
 
     def fill_list(self):
         lv = self.query_one("#list", ListView)
@@ -749,6 +818,8 @@ class YtmApp(App):
                 self.show("queue")
             elif cmd in ("quit", "exit"):
                 self.exit()
+            elif cmd in ("set", "mode"):
+                self.change_setting(cmd, arg)
             elif cmd == "cost":
                 self.cost_report()
             elif cmd in ("help", "?"):
@@ -788,7 +859,7 @@ class YtmApp(App):
             names = [t["name"] for t in self.library_themes()]
             cur = self.theme_spec["name"]
             nxt = names[(names.index(cur) + 1) % len(names)] if cur in names else names[0]
-            self.apply_theme(self.theme_named(nxt))
+            self.restyle(self.theme_named(nxt))
             self.lib.log("theme_cycle", self.current_id() or "", to=nxt)
             self.say(f"◐ {escape(nxt)}")
         elif bid == "vibe":  # instant: calm strips decoration, loud adds it

@@ -134,6 +134,10 @@ class Library:
     def themes(self):
         return [json.loads(r[0]) for r in self._q("SELECT spec FROM themes ORDER BY created")]
 
+    def themes_since(self, at):
+        """How many themes were written since a unix time."""
+        return self._q("SELECT COUNT(*) FROM themes WHERE created>=?", (at,))[0][0]
+
     def save_theme(self, spec):
         self._q("INSERT OR REPLACE INTO themes VALUES (?,?,?)", (spec["name"], json.dumps(spec), time.time()))
 

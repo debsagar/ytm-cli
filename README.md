@@ -88,6 +88,20 @@ To turn it on, create `%USERPROFILE%\.config\ytm\secrets.env` (outside the repo)
 
 Every paid call is logged with its tokens and price. The footer shows what the brain has spent today, and `cost` shows today, this month and all time. Jev costs about $0.00003 per song; a new theme costs about $0.0004.
 
+### Settings
+
+Type `set` to see every setting and `set <key> <value>` to change one (`mode off` is a shortcut for `set mode off`). They are saved in `%USERPROFILE%\.config\ytm\settings.toml`, which you can also edit by hand while ytm runs.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `mode` | `jev` | `off`: no paid calls (songs measured before still get their theme). `jev`: measure new songs, and let the LLM write the occasional new theme. `yolo`: reserved for LLM-designed widgets |
+| `budget_day`, `budget_month` | `0.05`, `1.0` | Dollar limits. LLM work pauses at 80% of either, Jev stops at 100% |
+| `restyle` | `song` | When the look may change: `song`, `every 3` (songs), `10min`, or `pinned` |
+| `stickiness` | `0.5` | 0 switches to the best theme every time; 1 only for big changes. On 84 test songs, 0.5 changed the look about every 3 songs and 1 about every 12 |
+| `can_change` | colours, motif, layout | Which parts a restyle may change; e.g. `set can_change colours` keeps your layout fixed |
+| `motion` | `full` | Animation: `full`, `low` (one frame a second) or `off` |
+| `grow_themes`, `max_new_themes_week` | `auto`, `3` | Whether and how often the LLM may write new themes |
+
 ## Classic commands
 
 The original one-shot commands still work and start mpv directly in the terminal.
