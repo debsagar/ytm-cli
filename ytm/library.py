@@ -1,12 +1,30 @@
-"""Local data: play history. Reads the history.tsv written by mpv/scripts/history.lua.
+"""Local data: play history (history.tsv, written by mpv/scripts/history.lua),
+plus liked songs and playlists in a small SQLite database (data/ytm.db)."""
 
-(Step 4 of the plan moves this to SQLite and adds playlists; the UI won't change.)
-"""
+import json
+import sqlite3
+import threading
+import time
 
-from .player import MPV_CONFIG
+from .player import MPV_CONFIG, ROOT
 from .search import Track
 
 HISTORY = MPV_CONFIG / "history.tsv"
+DB = ROOT / "data" / "ytm.db"
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS tracks (id TEXT PRIMARY KEY, title TEXT, artist TEXT, duration TEXT);
+CREATE TABLE IF NOT EXISTS likes (id TEXT PRIMARY KEY, at REAL);
+CREATE TABLE IF NOT EXISTS playlists (name TEXT PRIMARY KEY, created REAL);
+CREATE TABLE IF NOT EXISTS playlist_items (
+    playlist TEXT, id TEXT, pos INTEGER,
+    PRIMARY KEY (playlist, id)
+);
+CREATE TABLE IF NOT EXISTS features (id TEXT PRIMARY KEY, data TEXT);  -- Jev judgment per song
+CREATE TABLE IF NOT EXISTS themes (name TEXT PRIMARY KEY, spec TEXT, created REAL);  -- LLM-written themes
+CREATE TABLE IF NOT EXISTS centres (name TEXT PRIMARY KEY, vec TEXT);  -- learned cluster centres
+CREATE TABLE IF NOT EXISTS events (at REAL, type TEXT, id TEXT, data TEXT);  -- play/skip/tweak signals
+"""
 
 
 def history(limit=50):
@@ -26,3 +44,112 @@ def history(limit=50):
         if len(out) >= limit:
             break
     return out
+
+
+class Library:
+    def __init__(self, path=DB):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.db = sqlite3.connect(path, check_same_thread=False)
+        self.db.executescript(SCHEMA)
+        self.lock = threading.Lock()
+
+    def _q(self, sql, args=()):
+        with self.lock, self.db:
+            return self.db.execute(sql, args).fetchall()
+
+    def _save(self, t: Track):
+        self._q("INSERT OR REPLACE INTO tracks VALUES (?,?,?,?)", (t.video_id, t.title, t.artist, t.duration))
+
+    def _tracks(self, sql, args=()):
+        return [Track(*row) for row in self._q(sql, args)]
+
+    # ---- likes ----
+    def liked_ids(self):
+        return {r[0] for r in self._q("SELECT id FROM likes")}
+
+    def toggle_like(self, t: Track):
+        """Returns True if the song is now liked."""
+        if self._q("SELECT 1 FROM likes WHERE id=?", (t.video_id,)):
+            self._q("DELETE FROM likes WHERE id=?", (t.video_id,))
+            return False
+        self._save(t)
+        self._q("INSERT INTO likes VALUES (?,?)", (t.video_id, time.time()))
+        return True
+
+    def liked(self):
+        return self._tracks(
+            "SELECT t.id, t.title, t.artist, t.duration FROM likes l JOIN tracks t ON t.id=l.id ORDER BY l.at DESC")
+
+    # ---- playlists ----
+    def playlists(self):
+        """[(name, song count)] newest first."""
+        return self._q(
+            "SELECT p.name, COUNT(i.id) FROM playlists p LEFT JOIN playlist_items i ON i.playlist=p.name "
+            "GROUP BY p.name ORDER BY p.created DESC")
+
+    def add_to_playlist(self, name, tracks):
+        """Adds songs (skipping ones already in it); creates the playlist if needed. Returns how many were added."""
+        self._q("INSERT OR IGNORE INTO playlists VALUES (?,?)", (name, time.time()))
+        start = self._q("SELECT COALESCE(MAX(pos), 0) FROM playlist_items WHERE playlist=?", (name,))[0][0]
+        added = 0
+        for t in tracks:
+            self._save(t)
+            if not self._q("SELECT 1 FROM playlist_items WHERE playlist=? AND id=?", (name, t.video_id)):
+                added += 1
+                self._q("INSERT INTO playlist_items VALUES (?,?,?)", (name, t.video_id, start + added))
+        return added
+
+    def playlist(self, name):
+        return self._tracks(
+            "SELECT t.id, t.title, t.artist, t.duration FROM playlist_items i JOIN tracks t ON t.id=i.id "
+            "WHERE i.playlist=? ORDER BY i.pos", (name,))
+
+    def remove_from_playlist(self, name, video_id):
+        self._q("DELETE FROM playlist_items WHERE playlist=? AND id=?", (name, video_id))
+
+    # ---- song features, themes, events (the memory the brain reads) ----
+    def features(self, video_id):
+        row = self._q("SELECT data FROM features WHERE id=?", (video_id,))
+        return json.loads(row[0][0]) if row else None
+
+    def save_features(self, video_id, data):
+        self._q("INSERT OR REPLACE INTO features VALUES (?,?)", (video_id, json.dumps(data)))
+
+    def centres(self):
+        return {n: json.loads(v) for n, v in self._q("SELECT name, vec FROM centres")}
+
+    def set_centre(self, name, vec):
+        self._q("INSERT OR REPLACE INTO centres VALUES (?,?)", (name, json.dumps(vec)))
+
+    def remember(self, video_id, title, artist):
+        self._q("INSERT OR IGNORE INTO tracks VALUES (?,?,?,?)", (video_id, title, artist, ""))
+
+    def all_features(self):
+        return {vid: json.loads(d) for vid, d in self._q("SELECT id, data FROM features")}
+
+    def song(self, video_id):
+        row = self._q("SELECT title, artist FROM tracks WHERE id=?", (video_id,))
+        return {"title": row[0][0], "artist": row[0][1]} if row else None
+
+    def themes(self):
+        return [json.loads(r[0]) for r in self._q("SELECT spec FROM themes ORDER BY created")]
+
+    def save_theme(self, spec):
+        self._q("INSERT OR REPLACE INTO themes VALUES (?,?,?)", (spec["name"], json.dumps(spec), time.time()))
+
+    def log(self, type_, video_id="", **data):
+        self._q("INSERT INTO events VALUES (?,?,?,?)", (time.time(), type_, video_id, json.dumps(data)))
+
+    def profile(self, limit=15):
+        """Small taste summary for prompts: top artists and playlist names."""
+        rows = self._q("SELECT artist FROM tracks WHERE artist != ''")
+        counts = {}
+        for (a,) in rows:
+            for name in a.split(", "):
+                counts[name] = counts.get(name, 0) + 1
+        top = sorted(counts, key=counts.get, reverse=True)[:limit]
+        return {"top_artists": top, "playlists": [n for n, _ in self.playlists()]}
+
+    def delete_playlist(self, name):
+        self._q("DELETE FROM playlist_items WHERE playlist=?", (name,))
+        self._q("DELETE FROM playlists WHERE name=?", (name,))

@@ -8,6 +8,12 @@ rem No arguments: open the mini-player app (ytm\app.py) in its own small
 rem Windows Terminal window. "ytm here" runs it in the current terminal.
 set "YTM_PY=%USERPROFILE%\.venvs\ytm\Scripts\python.exe"
 if /i "%~1"=="here" goto app
+if /i "%~1"=="import" (
+    pushd "%~dp0"
+    "%YTM_PY%" -m ytm.importer %*
+    popd
+    exit /b
+)
 if not "%~1"=="" goto classic
 where wt >nul 2>nul || goto app
 rem wt treats ";" as a command separator, so escape it in the folder path
