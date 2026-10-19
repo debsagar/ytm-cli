@@ -27,6 +27,11 @@ GROUP = 0.5         # how close outliers must be to each other to form a new clu
 MIN_CLUSTER = 3     # outliers needed before a new theme is written
 MAX_THEMES = 24
 
+# $ per token. Jev bills input only. OpenRouter usually reports the exact cost itself;
+# the Haiku price is the fallback when it doesn't.
+JEV_IN = 0.042 / 1e6
+LLM_IN, LLM_OUT = 0.10 / 1e6, 0.50 / 1e6
+
 
 def _key(name):
     if os.environ.get(name):
@@ -50,6 +55,12 @@ def _post(url, key, body, timeout=20):
         return json.loads(r.read())
 
 
+def _spend(lib, api, tokens_in, tokens_out, usd, video_id=""):
+    """Every paid call becomes a 'cost' event, so the UI and the budget cap can add them up."""
+    if lib:
+        lib.log("cost", video_id, api=api, tokens_in=tokens_in, tokens_out=tokens_out, usd=usd)
+
+
 # ---- Jev: measure the song (one request, all questions in parallel) ----
 ENERGY = ["slow, quiet, ambient or acoustic", "mid-tempo, relaxed groove",
           "upbeat and danceable", "intense, loud, peak-time banger"]
@@ -66,7 +77,7 @@ TAGS = {
 }
 
 
-def judge(song):
+def judge(song, lib=None, video_id=""):
     questions = {
         "energy": {"type": "score", "criteria": ENERGY, "instructions": "How energetic is `song`?"},
         "mood": {"type": "choice", "criteria": MOODS, "instructions": "What is the dominant mood of `song`?"},
@@ -74,6 +85,9 @@ def judge(song):
     }
     r = _post(JEV_URL, _key("TYPESAFE_API_KEY"), {"model": "jev-latest", "state": {"song": song},
                                                   "questions": questions})
+    u = r.get("usage", {})
+    _spend(lib, "jev", u.get("input_tokens", 0), u.get("output_tokens", 0),
+           u.get("input_tokens", 0) * JEV_IN, video_id)
     a = r["answers"]
     return {
         "energy": round(a["energy"]["score"] / (len(ENERGY) - 1), 2),  # 0..1
@@ -132,7 +146,7 @@ Return ONLY a JSON object:
 Keep text readable: bg/panel dark, text light, accent vivid."""
 
 
-def write_theme(songs, profile, existing):
+def write_theme(songs, profile, existing, lib=None):
     if not _key("OPENROUTER_API_KEY"):
         return None
     prompt = WRITER_PROMPT.format(songs=json.dumps(songs), profile=json.dumps(profile),
@@ -140,7 +154,11 @@ def write_theme(songs, profile, existing):
                                   styles=list(theme.PROGRESS))
     r = _post(LLM_URL, _key("OPENROUTER_API_KEY"), {
         "model": LLM_MODEL, "max_tokens": 2000, "response_format": {"type": "json_object"},
+        "usage": {"include": True},  # ask OpenRouter to report the cost
         "messages": [{"role": "user", "content": prompt}]}, timeout=40)
+    u = r.get("usage", {})
+    tin, tout = u.get("prompt_tokens", 0), u.get("completion_tokens", 0)
+    _spend(lib, "llm", tin, tout, u.get("cost", tin * LLM_IN + tout * LLM_OUT))
     text = r["choices"][0]["message"].get("content") or ""  # empty if reasoning used up max_tokens
     if "{" not in text:
         return None
@@ -160,7 +178,7 @@ def grow(lib, themes):
         if len(group) >= MIN_CLUSTER:
             songs = [s for s in (lib.song(o) for o, _ in group) if s]
             measured = describe([song_vec(g) for _, g in group])
-            spec = write_theme({"songs": songs, "measured": measured}, lib.profile(), [t["name"] for t in themes])
+            spec = write_theme({"songs": songs, "measured": measured}, lib.profile(), [t["name"] for t in themes], lib)
             if not spec or spec["name"] in {t["name"] for t in themes}:
                 return None
             vs = [song_vec(g) for _, g in group]
@@ -204,7 +222,7 @@ def think(song, lib):
     lib.remember(song["id"], song["title"], song["artist"])
     f = lib.features(song["id"])
     if not f or "mood_p" not in f:
-        f = judge({"title": song["title"], "artist": song["artist"]})
+        f = judge({"title": song["title"], "artist": song["artist"]}, lib, song["id"])
     themes = all_themes(lib)
     assign(f, themes)
     lib.save_features(song["id"], f)

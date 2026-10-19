@@ -2,6 +2,8 @@
 
 import os
 import re
+import time
+from datetime import date
 
 # Windows Terminal supports 24-bit colour but doesn't always advertise it,
 # which makes Textual fall back to grey. Say so before Textual starts.
@@ -46,6 +48,7 @@ HELP_ROWS = [
     ("skip · prev · pause · vol 40", "playback"),
     ("remove 3 · clear", "edit the queue"),
     ("auto", "toggle autoplay (keeps adding similar songs)"),
+    ("cost", "what the brain has spent (Jev + LLM)"),
     ("quit", "exit (Ctrl+Q also works)"),
     ("", ""),
     ("Mouse", "every button and tab is clickable"),
@@ -86,6 +89,19 @@ def tidy(t: Track):
     """A Track with clean title/artist fields, for saving to likes and playlists."""
     title, artist = track_parts(t)
     return Track(t.video_id, title, artist, t.duration)
+
+
+def fmt_usd(usd):
+    """Jev costs fractions of a cent per song, so small amounts are shown in cents."""
+    if usd >= 0.01:
+        return f"${usd:.2f}"
+    return f"{usd * 100:.3f}¢" if usd else "$0"
+
+
+def since(period):
+    """Unix time at the start of today or this month."""
+    d = date.today()
+    return time.mktime((d if period == "today" else d.replace(day=1)).timetuple())
 
 
 def keys(*pairs):
@@ -397,6 +413,8 @@ class YtmApp(App):
                 brain.think(self.song_dict(next_vid), self.lib)  # ready before the song starts
         except Exception as e:  # network/API trouble: keep the current look
             self.call_from_thread(self.say, f"brain offline: {escape(str(e))[:60]}")
+        finally:
+            self.call_from_thread(self.render_footer)  # new spend shows up right away
 
     def show_song_theme(self, feats):
         self.song_feats = feats
@@ -534,7 +552,17 @@ class YtmApp(App):
                         ("d", "remove"), ("←→", "tabs"), ("esc", "back"))
         else:
             hint = keys(("enter", "search"), ("tab", "list"), ("^space", "pause"), ("^n", "next"), ("?", "help"))
+        today = sum(usd for _, usd in self.lib.spend(since("today")).values())
+        if today:
+            hint += f"   [{C['dim']}]{fmt_usd(today)} today[/]"
         self.query_one("#footer").update(hint)
+
+    def cost_report(self):
+        def line(period, s):
+            calls = " · ".join(f"{n} {api}" for api, (n, _) in sorted(s.items())) or "no calls"
+            return f"{period} {fmt_usd(sum(u for _, u in s.values()))} ({calls})"
+        self.say(escape(" · ".join(line(p, self.lib.spend(t)) for p, t in
+                                   (("today", since("today")), ("month", since("month")), ("all", 0)))))
 
     def fill_list(self):
         lv = self.query_one("#list", ListView)
@@ -721,6 +749,8 @@ class YtmApp(App):
                 self.show("queue")
             elif cmd in ("quit", "exit"):
                 self.exit()
+            elif cmd == "cost":
+                self.cost_report()
             elif cmd in ("help", "?"):
                 self.action_help()
             elif URL_RE.match(line):

@@ -140,6 +140,12 @@ class Library:
     def log(self, type_, video_id="", **data):
         self._q("INSERT INTO events VALUES (?,?,?,?)", (time.time(), type_, video_id, json.dumps(data)))
 
+    def spend(self, since=0.0):
+        """{api: (calls, usd)} for paid calls logged since a unix time."""
+        rows = self._q("SELECT json_extract(data, '$.api'), COUNT(*), SUM(json_extract(data, '$.usd')) "
+                       "FROM events WHERE type='cost' AND at>=? GROUP BY 1", (since,))
+        return {api: (n, usd or 0.0) for api, n, usd in rows}
+
     def profile(self, limit=15):
         """Small taste summary for prompts: top artists and playlist names."""
         rows = self._q("SELECT artist FROM tracks WHERE artist != ''")
