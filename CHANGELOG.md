@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Versions follow [Semant
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-19
+
+### Changed
+- Packages are managed with [uv](https://docs.astral.sh/uv/) and pinned in `uv.lock`. Each copy of the code gets its own `.venv`, created on the first `ytm` run and synced by `ytm update`, so updating the installed copy no longer changes a dev checkout. Install uv first; the old `%USERPROFILE%\.venvs\ytm` can be deleted.
+
 ## [0.5.0] - 2026-10-19
 
 ### Added
@@ -80,6 +85,7 @@ All notable changes to this project are documented here. Versions follow [Semant
 - Play history (`ytm history`), logged by an mpv Lua script.
 - Minimal-RAM setup: audio-only mpv with a small cache; PowerShell exits before playback.
 
+[0.5.1]: https://github.com/debsagar/ytm-cli/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/debsagar/ytm-cli/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/debsagar/ytm-cli/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/debsagar/ytm-cli/compare/v0.2.0...v0.3.0

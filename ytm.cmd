@@ -6,7 +6,8 @@ setlocal DisableDelayedExpansion
 
 rem No arguments: open the mini-player app (ytm\app.py) in its own small
 rem Windows Terminal window. "ytm here" runs it in the current terminal.
-set "YTM_PY=%USERPROFILE%\.venvs\ytm\Scripts\python.exe"
+set "YTM_PY=%~dp0.venv\Scripts\python.exe"
+if not exist "%YTM_PY%" call :setup || exit /b 1
 if /i "%~1"=="here" goto app
 if /i "%~1"=="import" (
     pushd "%~dp0"
@@ -18,10 +19,10 @@ rem One line on purpose: cmd re-reads this file as it runs, and the update repla
 if /i "%~1"=="update" (pushd "%~dp0" & "%YTM_PY%" -m ytm.update & popd & exit /b)
 if not "%~1"=="" goto classic
 where wt >nul 2>nul || goto app
-rem wt treats ";" as a command separator, so escape it in the folder path
+rem wt treats ";" as a command separator, so escape it in the paths it gets
 set "YTM_DIR=%~dp0."
 set "YTM_DIR=%YTM_DIR:;=\;%"
-start "" wt -w new --size 74,24 --title ytm -d "%YTM_DIR%" "%YTM_PY%" -m ytm
+start "" wt -w new --size 74,24 --title ytm -d "%YTM_DIR%" "%YTM_DIR%\.venv\Scripts\python.exe" -m ytm
 exit /b 0
 
 :app
@@ -54,3 +55,14 @@ if not defined YTM_TARGET exit /b 1
 
 "%YTM_MPV%" "--config-dir=%~dp0mpv" %YTM_EXTRA% -- "%YTM_TARGET%"
 exit /b %ERRORLEVEL%
+
+rem First run: create .venv next to the code with the locked packages.
+:setup
+echo Setting up ytm's Python packages (first run only)...
+where uv >nul 2>nul || (
+    echo ytm needs uv. Install it, open a new terminal, then run ytm again:
+    echo   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+    exit /b 1
+)
+uv sync -q --frozen --no-dev --directory "%~dp0."
+exit /b

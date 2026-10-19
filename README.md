@@ -11,7 +11,7 @@ Under the hood it is a single audio-only [mpv](https://mpv.io) process fed by [y
 ## Requirements
 
 - Windows 10 or 11 (Windows Terminal recommended)
-- Python 3.10+
+- [uv](https://docs.astral.sh/uv/), which also fetches Python 3.12 if you don't have it
 - mpv and yt-dlp (yt-dlp pulls in FFmpeg automatically)
 - A JavaScript runtime for yt-dlp: [Deno](https://deno.com) (yt-dlp's default) or Node.js
 
@@ -22,7 +22,7 @@ Under the hood it is a single audio-only [mpv](https://mpv.io) process fed by [y
    ```powershell
    winget install shinchiro.mpv
    winget install yt-dlp.yt-dlp
-   winget install Python.Python.3.12
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
    winget install DenoLand.Deno   # skip if you already have Node.js
    ```
 
@@ -32,14 +32,7 @@ Under the hood it is a single audio-only [mpv](https://mpv.io) process fed by [y
    git clone https://github.com/debsagar/ytm-cli.git C:\Tools\ytm
    ```
 
-3. Create the Python environment the launcher expects (outside the repo, because Python refuses paths containing `;`):
-
-   ```powershell
-   python -m venv $env:USERPROFILE\.venvs\ytm
-   & $env:USERPROFILE\.venvs\ytm\Scripts\python.exe -m pip install -r C:\Tools\ytm\requirements.txt
-   ```
-
-   This installs Textual, ytmusicapi and Pillow (for album art).
+3. Nothing to install by hand: the first `ytm` run uses uv to create a `.venv` folder next to the code with the exact package versions in `uv.lock` (Textual, ytmusicapi and Pillow for album art). Open a new terminal after installing uv so it is on your `PATH`.
 
 4. Make `ytm` available from any terminal. Either add the clone folder to your `PATH`, or create a one-line forwarder in a folder that is already on it:
 
