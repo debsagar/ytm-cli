@@ -17,6 +17,18 @@ Under the hood it is a single audio-only [mpv](https://mpv.io) process fed by [y
 
 ## Install
 
+Paste this into PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/debsagar/ytm-cli/main/install.ps1 | iex
+```
+
+Then run `ytm`, in the same terminal or any new one. The script installs whatever is missing (mpv, yt-dlp, uv, git, and Deno if you have no Node.js) with winget, puts ytm in `%LOCALAPPDATA%\ytm`, sets up its Python packages and adds the `ytm` command. Running it again updates ytm, like `ytm update`.
+
+To uninstall, delete `%LOCALAPPDATA%\ytm` (your library and history are in its `data` and `mpv` folders, so copy them first if you want to keep them) and `%LOCALAPPDATA%\Microsoft\WindowsApps\ytm.cmd`.
+
+### Manual install
+
 1. Install the dependencies:
 
    ```powershell
