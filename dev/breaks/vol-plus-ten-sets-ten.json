@@ -1,0 +1,52 @@
+[
+ {
+  "name": "vol-plus-ten-sets-ten",
+  "why": "`vol +10` (meaning louder) sets the volume to 10%: int('+10') == 10, so it's treated as absolute.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   {
+    "mpv": {
+     "volume": 50
+    }
+   },
+   "vol +10"
+  ],
+  "absent": [
+   "vol 10%"
+  ],
+  "expect": [
+   "vol 60%"
+  ]
+ },
+ {
+  "name": "vol-plus-ten-sets-ten-down",
+  "why": "`vol +10` (meaning louder) sets the volume to 10%: int('+10') == 10, so it's treated as absolute.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   {
+    "mpv": {
+     "volume": 50
+    }
+   },
+   "vol -10"
+  ],
+  "absent": [
+   "vol 10%"
+  ],
+  "expect": [
+   "vol 40%"
+  ]
+ }
+]

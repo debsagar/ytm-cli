@@ -1,0 +1,18 @@
+{
+ "why": "When the queue ended, _art_id kept the last song's id, so playing that same song again wasn't seen as a new song: no play event, no theme (real mpv: hunt2 app_probe.py replay-same).",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  }
+ ],
+ "steps": [
+  {"mpv": {"playlist-pos": -1, "media-title": null}},
+  "play youtu.be/aaaaaaaaaaa",
+  {"wait": 6}
+ ],
+ "expect": [
+  "neon rave"
+ ]
+}

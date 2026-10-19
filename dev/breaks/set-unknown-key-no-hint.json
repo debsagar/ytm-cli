@@ -1,0 +1,96 @@
+[
+ {
+  "why": "`set max themes 20` parsed as key 'max' and only said 'unknown setting max', so the user thought it saved. The error must name the closest real key and be readable in every layout (the dashboard's ask panel is ~34 columns, so it must wrap there).",
+  "name": "set-unknown-key-no-hint-classic",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "Song",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "layout classic",
+   "set max themes 20"
+  ],
+  "expect": [
+   "max_new_themes_week?"
+  ]
+ },
+ {
+  "why": "`set max themes 20` parsed as key 'max' and only said 'unknown setting max', so the user thought it saved. The error must name the closest real key and be readable in every layout (the dashboard's ask panel is ~34 columns, so it must wrap there).",
+  "name": "set-unknown-key-no-hint-hero",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "Song",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "layout hero",
+   "set max themes 20"
+  ],
+  "expect": [
+   "max_new_themes_week?"
+  ]
+ },
+ {
+  "why": "`set max themes 20` parsed as key 'max' and only said 'unknown setting max', so the user thought it saved. The error must name the closest real key and be readable in every layout (the dashboard's ask panel is ~34 columns, so it must wrap there).",
+  "name": "set-unknown-key-no-hint-stage",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "Song",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "layout stage",
+   "set max themes 20"
+  ],
+  "expect": [
+   "max_new_themes_week?"
+  ]
+ },
+ {
+  "why": "`set max themes 20` parsed as key 'max' and only said 'unknown setting max', so the user thought it saved. The error must name the closest real key and be readable in every layout (the dashboard's ask panel is ~34 columns, so it must wrap there).",
+  "name": "set-unknown-key-no-hint-focus",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "Song",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "layout focus",
+   "set max themes 20"
+  ],
+  "expect": [
+   "max_new_themes_week?"
+  ]
+ },
+ {
+  "why": "`set max themes 20` parsed as key 'max' and only said 'unknown setting max', so the user thought it saved. The error must name the closest real key and be readable in every layout (the dashboard's ask panel is ~34 columns, so it must wrap there).",
+  "name": "set-unknown-key-no-hint-dashboard",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "Song",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "layout dashboard",
+   "set max themes 20"
+  ],
+  "expect": [
+   "max_new_themes_week?"
+  ],
+  "size": [
+   100,
+   30
+  ]
+ }
+]

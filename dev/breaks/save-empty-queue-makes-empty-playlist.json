@@ -1,0 +1,14 @@
+{
+ "name": "save-empty-queue-makes-empty-playlist",
+ "why": "`save mix` with nothing queued creates an empty playlist and reports 'saved 0 songs' instead of saying the queue is empty.",
+ "steps": [
+  "save mix",
+  "playlists"
+ ],
+ "absent": [
+  "0 songs"
+ ],
+ "expect": [
+  "no playlists yet"
+ ]
+}

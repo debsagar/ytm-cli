@@ -1,0 +1,101 @@
+[
+ {
+  "why": "With the list focused the footer always advertises 'd remove' (and 'a queue'), but action_row's remove only handles queue and playlist: on the liked tab (and history/results) d silently does nothing, with no message.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "Song",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "like",
+   "liked",
+   {
+    "key": "tab"
+   },
+   {
+    "key": "d"
+   }
+  ],
+  "expect": [
+   "no liked songs"
+  ],
+  "name": "liked-tab-d-does-nothing"
+ },
+ {
+  "name": "liked-tab-d-does-nothing-results",
+  "why": "On history (and results) d can't remove anything: the footer must not offer it, and pressing it says what d does.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "Song",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "search x",
+   {
+    "key": "d"
+   }
+  ],
+  "expect": [
+   "d removes from the queue or a playlist",
+   "a queue"
+  ],
+  "absent": [
+   "d remove "
+  ],
+  "results": [
+   {
+    "id": "rrrrrrrrrrr",
+    "title": "Found",
+    "artist": "R"
+   }
+  ]
+ },
+ {
+  "name": "liked-tab-d-does-nothing-queue",
+  "why": "On the queue tab a (queue) does nothing, so the footer must not offer it.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "Song",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "queue",
+   {
+    "key": "tab"
+   }
+  ],
+  "expect": [
+   "d remove"
+  ],
+  "absent": [
+   "a queue"
+  ]
+ },
+ {
+  "name": "liked-tab-d-does-nothing-liked-footer",
+  "why": "On the liked tab the footer says d unlikes.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "Song",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "like",
+   "liked",
+   {
+    "key": "tab"
+   }
+  ],
+  "expect": [
+   "d unlike"
+  ]
+ }
+]

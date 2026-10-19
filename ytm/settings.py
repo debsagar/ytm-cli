@@ -4,6 +4,7 @@ Stored in ~/.config/ytm/settings.toml (outside the repo). Edit it by hand or wit
 `set <key> <value>` in the app; the file is re-read when it changes, so edits
 apply without a restart. Bad or missing values fall back to the defaults."""
 
+import difflib
 import math
 import re
 import time
@@ -44,9 +45,11 @@ def _valid(key, v):
             raise ValueError(f"{key}: {SPEC[key][2]}")
         return v
     if isinstance(default, list):  # a subset of the allowed values
-        if not isinstance(v, list) or not all(isinstance(x, str) and x in rule for x in v):
+        if not isinstance(v, list) or not all(isinstance(x, str) and x.lower() in rule for x in v):
             raise ValueError(f"{key}: pick from {', '.join(rule)}")
-        return v
+        return [x.lower() for x in v]
+    if isinstance(v, str):
+        v = v.lower()  # mode = "Off" is fine
     if v not in rule:
         raise ValueError(f"{key}: one of {', '.join(rule)}")
     return v
@@ -55,6 +58,11 @@ def _valid(key, v):
 def _parse(key, text):
     """Turn what the user typed after `set key` into a value of the right type."""
     default = SPEC[key][0]
+    if text[:1] in ("\"", "'", "["):  # the TOML form the popup and the file show: "pinned", ["colours", "motif"]
+        try:
+            return tomllib.loads(f"v = {text}")["v"]
+        except tomllib.TOMLDecodeError:
+            raise ValueError(f"{key}: can't read {text}") from None
     if isinstance(default, list):
         return [x.strip() for x in text.replace(",", " ").split() if x.strip()]
     if isinstance(default, (int, float)):
@@ -63,6 +71,18 @@ def _parse(key, text):
         except ValueError:
             raise ValueError(f"{key} must be a number") from None
     return text
+
+
+def _closest(key, text):
+    """The real key the user most likely meant; `set max themes 20` gives max_new_themes_week."""
+    words = [key.lower(), *text.lower().split()]
+    best = max(SPEC, key=lambda k: len(set(words) & set(k.split("_"))))  # most shared words
+    if set(words) & set(best.split("_")):
+        return best
+    for n in range(1, len(words) + 1):  # typos: "stickyness", "budget_dy"
+        if len(words[0]) > 2 and (m := difflib.get_close_matches("_".join(words[:n]), SPEC, 1)):  # "me" isn't "mode"
+            return m[0]
+    return None
 
 
 def _toml(v):
@@ -77,7 +97,8 @@ class Settings:
     def __init__(self, path=PATH):
         self.path = path
         self.values = {k: s[0] for k, s in SPEC.items()}
-        self.error = None
+        self.error = None  # a syntax error: the whole file is ignored
+        self.bad = None    # values that were rejected (the other keys still apply)
         self._mtime = None
         self.reload()
 
@@ -85,7 +106,7 @@ class Settings:
         return self.values[key]
 
     def reload(self):
-        """Re-read the file if it changed. Returns True if it did (check .error)."""
+        """Re-read the file if it changed. Returns True if it did (check .error and .bad)."""
         try:
             mtime = self.path.stat().st_mtime
         except FileNotFoundError:
@@ -93,25 +114,30 @@ class Settings:
         if mtime == self._mtime:
             return False
         self._mtime = mtime
-        data = {}
+        data, self.error = {}, None  # a deleted file is no error
         if mtime is not None:
             try:
                 data = tomllib.loads(self.path.read_text(encoding="utf-8-sig"))  # Notepad adds a BOM
-                self.error = None
             except (tomllib.TOMLDecodeError, UnicodeDecodeError) as e:
                 self.error = f"settings.toml: {e}"  # keep the last good values
                 return True
+        bad = []
         for key, (default, _, _) in SPEC.items():
             try:
                 self.values[key] = _valid(key, data[key]) if key in data else default
-            except ValueError:
+            except ValueError as e:
                 self.values[key] = default
+                bad.append(f"{e}, using {_toml(default)}")
+        self.bad = "settings.toml: " + " · ".join(bad) if bad else None
         return True
 
     def set(self, key, text):
         """Change one setting from text typed in the app. Raises ValueError with a readable reason."""
         if key not in SPEC:
-            raise ValueError(f"unknown setting {key}; type `set` to see them all")
+            near = _closest(key, text)
+            raise ValueError(f"unknown setting {key}: " + (f"did you mean {near}?" if near else "type `set` to see them all"))
+        if self.error:  # saving now would rewrite the file from defaults and erase the user's edits
+            raise ValueError(f"fix settings.toml first: {self.error.removeprefix('settings.toml: ')}")
         self.values[key] = _valid(key, _parse(key, text.strip()))
         self.save()
         return self.values[key]

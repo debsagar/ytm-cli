@@ -1,0 +1,24 @@
+{
+ "name": "song-quit-playing-games-exits-app",
+ "why": "A search starting with a command word runs the command: 'quit playing games' (Backstreet Boys) exits ytm instead of searching, because run_command matches cmd 'quit' whatever the argument.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  }
+ ],
+ "results": [
+  {
+   "id": "bbbbbbbbbbb",
+   "title": "Quit Playing Games",
+   "artist": "Backstreet Boys"
+  }
+ ],
+ "steps": [
+  "quit playing games"
+ ],
+ "expect": [
+  "Quit Playing Games"
+ ]
+}

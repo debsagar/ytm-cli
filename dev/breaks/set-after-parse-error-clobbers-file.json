@@ -1,0 +1,25 @@
+{
+ "name": "set-after-parse-error-clobbers-file",
+ "why": "With a syntax error in settings.toml, Settings keeps defaults; any `set` then rewrites the whole file from those values, erasing the user's other edits (budget_day 0.5 becomes 0.05) without warning. The screen can't show the file, so the check is that `set` refuses (and the reload keeps showing the error) instead of saving.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  }
+ ],
+ "settings": "budget_day = 0.5\nmode = off\n",
+ "steps": [
+  "set mode off",
+  {
+   "wait": 2.5
+  }
+ ],
+ "expect": [
+  "fix settings.toml first"
+ ],
+ "absent": [
+  "set mode = ",
+  "settings reloaded"
+ ]
+}

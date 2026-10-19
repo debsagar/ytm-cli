@@ -1,0 +1,20 @@
+{
+ "name": "settings-file-parse-error-hidden-at-start",
+ "why": "A TOML syntax error present at launch (mode = off, unquoted) is stored in Settings.error but never shown: tick only reports it when the mtime changes, so all settings are silently defaults (mode jev).",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  }
+ ],
+ "settings": "mode = off\n",
+ "steps": [
+  {
+   "wait": 2.5
+  }
+ ],
+ "expect": [
+  "settings.toml"
+ ]
+}

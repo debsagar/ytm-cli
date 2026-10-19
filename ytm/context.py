@@ -16,6 +16,7 @@ import time
 from collections import deque
 
 from . import brain, library
+from .search import VID_RE
 
 HALF_LIFE = 45 * 86400   # a play counts half as much after 45 days
 SESSION_GAP = 30 * 60    # a pause this long starts a new session
@@ -63,7 +64,8 @@ def _plays():
     with open(library.HISTORY, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             parts = line.rstrip("\n").split("\t", 2)
-            if len(parts) != 3 or "v=" not in parts[1]:
+            m = VID_RE.search(parts[1]) if len(parts) == 3 else None
+            if not m:
                 continue
             stamp = parts[0]
             try:
@@ -72,7 +74,7 @@ def _plays():
                 hour, minute = int(stamp[11:13]), int(stamp[14:16])
             except ValueError:
                 continue
-            yield days[stamp[:10]] + 3600 * hour + 60 * minute, hour, parts[1].split("v=", 1)[1][:11], parts[2]
+            yield days[stamp[:10]] + 3600 * hour + 60 * minute, hour, m.group(1), parts[2]
 
 
 def _settled(rows, per_song=False):

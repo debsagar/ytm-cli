@@ -7,6 +7,7 @@ All notable changes to this project are documented here. Versions follow [Semant
 ## [0.5.2] - 2026-10-19
 
 ### Added
+- `layout` opens a layout picker: each layout with its description, the current one marked, ones too big for the window dimmed; moving the highlight previews it, Enter keeps it, Esc puts yours back. ▦ still cycles.
 - One-command install: `irm https://raw.githubusercontent.com/debsagar/ytm-cli/main/install.ps1 | iex` installs missing dependencies with winget, clones ytm into `%LOCALAPPDATA%\ytm`, sets up its packages and adds the `ytm` command. Running it again updates.
 - Update channels: `stable` (the `main` branch) and `dev` (latest features). `ytm update dev` switches your copy to dev and `ytm update stable` takes it back, packages included; `ytm update` follows the channel you're on. Data and settings are never touched.
 

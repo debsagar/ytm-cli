@@ -1,0 +1,154 @@
+[
+ {
+  "name": "layout-picker-previews",
+  "why": "Bare `layout` (and ▦) cycled blind and nothing listed the layouts. `layout` opens a picker; moving the highlight previews the layout behind it (focus hides the art and the library), and Esc puts the original back. (74x30, so classic shows its art.)",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "layout classic",
+   "layout",
+   {
+    "key": "down"
+   },
+   {
+    "key": "down"
+   },
+   {
+    "key": "down"
+   }
+  ],
+  "expect": [
+   "layouts",
+   "● classic"
+  ],
+  "size": [
+   74,
+   30
+  ],
+  "absent": [
+   "▀▀▀▀",
+   "─ library"
+  ]
+ },
+ {
+  "name": "layout-picker-previews-esc",
+  "why": "Esc closes the picker and puts the layout you had back.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "layout classic",
+   "layout",
+   {
+    "key": "down"
+   },
+   {
+    "key": "down"
+   },
+   {
+    "key": "down"
+   },
+   {
+    "key": "escape"
+   }
+  ],
+  "absent": [
+   "layouts"
+  ],
+  "size": [
+   74,
+   30
+  ],
+  "expect": [
+   "▀▀▀▀",
+   "─ library"
+  ]
+ },
+ {
+  "name": "layout-picker-previews-enter",
+  "why": "Enter keeps the previewed layout, through the same path as `layout <name>`.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "layout classic",
+   "layout",
+   {
+    "key": "down"
+   },
+   {
+    "key": "down"
+   },
+   {
+    "key": "down"
+   },
+   {
+    "key": "enter"
+   }
+  ],
+  "expect": [
+   "▦ focus"
+  ],
+  "absent": [
+   "layouts",
+   "▀▀▀▀",
+   "─ library"
+  ],
+  "size": [
+   74,
+   30
+  ]
+ },
+ {
+  "name": "layout-picker-previews-too-small",
+  "why": "At 74x24 the dashboard doesn't fit: it's listed dimmed, and picking it says so instead of applying it.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "layout classic",
+   "layout",
+   {
+    "key": "down"
+   },
+   {
+    "key": "down"
+   },
+   {
+    "key": "down"
+   },
+   {
+    "key": "down"
+   },
+   {
+    "key": "enter"
+   }
+  ],
+  "expect": [
+   "needs a bigger window · four panels",
+   "dashboard needs a bigger window (100x30)",
+   "● classic"
+  ],
+  "size": [
+   74,
+   24
+  ]
+ }
+]

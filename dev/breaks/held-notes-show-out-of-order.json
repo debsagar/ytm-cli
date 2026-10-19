@@ -1,0 +1,25 @@
+{
+ "why": "Automatic notes held back after a reply each got their own timer with the same deadline, so they could fire in either order: the stale '✦ reading the song …' sometimes replaced the song's theme note for good.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  },
+  {
+   "id": "ccccccccccc",
+   "title": "Two",
+   "artist": "B"
+  }
+ ],
+ "steps": [
+  "skip",
+  {"wait": 6}
+ ],
+ "expect": [
+  "neon rave"
+ ],
+ "absent": [
+  "reading the song"
+ ]
+}

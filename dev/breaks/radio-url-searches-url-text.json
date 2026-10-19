@@ -1,0 +1,20 @@
+{
+ "name": "radio-url-searches-url-text",
+ "why": "`radio <youtube url>` sends the URL text to the song search instead of using the video id as the seed; only play/queue handle URLs.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  }
+ ],
+ "steps": [
+  "radio https://youtu.be/bbbbbbbbbbb"
+ ],
+ "absent": [
+  "no results for https"
+ ],
+ "expect": [
+  "radio · 1 song queued"
+ ]
+}

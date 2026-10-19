@@ -13,7 +13,7 @@ A scenario is a JSON object (or a list of them). Every field is optional:
   library   "copy" uses a copy of ~/.ytmdev data; default is an empty library
   settings  {key: "value"} applied with `set`, or raw text for settings.toml
   steps     list of: "text typed + Enter" | {"key": "tab"} | {"resize": [w, h]}
-            | {"mpv": {"time-pos": 99}} | {"click": "#id"} | {"wait": 0.5}
+            | {"mpv": {"time-pos": 99}} | {"click": "#id", "times": 2} | {"wait": 0.5}
   expect    strings that must appear on screen at the end
   absent    strings that must NOT appear (e.g. "Traceback", "None")
 
@@ -78,8 +78,10 @@ class FakePlayer:
         self._emit(playlist_count=len(self.items))
 
     def next(self):
-        if self.pos + 1 < len(self.items):
-            self._go(self.pos + 1)
+        if self.pos + 1 >= len(self.items):
+            return False
+        self._go(self.pos + 1)
+        return True
 
     def prev(self):
         if self.pos > 0:
@@ -192,7 +194,7 @@ async def run(sc, out, svg):
                     for k, v in step["mpv"].items():
                         app._apply(k, v)
                 elif "click" in step:
-                    await pilot.click(step["click"])
+                    await pilot.click(step["click"], times=step.get("times", 1))
                 await pilot.pause(step.get("wait", 0.3) if isinstance(step, dict) else 0.3)
             await pilot.pause(0.3)
             text = screen_text(app)

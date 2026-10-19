@@ -1,0 +1,87 @@
+[
+ {
+  "name": "set-key-equals-value-rejected-0",
+  "why": "The settings popup and the file show `key = value`, but typing it back fails: `set budget_day=0.10` silently opens the popup and changes nothing, and `set mode = off` / `set restyle \"pinned\"` are rejected as bad values.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "set budget_day=0.10"
+  ],
+  "expect": [
+   "set budget_day = 0.1"
+  ]
+ },
+ {
+  "name": "set-key-equals-value-rejected-1",
+  "why": "The settings popup and the file show `key = value`, but typing it back fails: `set budget_day=0.10` silently opens the popup and changes nothing, and `set mode = off` / `set restyle \"pinned\"` are rejected as bad values.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "set mode = off"
+  ],
+  "expect": [
+   "set mode = \"off\""
+  ]
+ },
+ {
+  "name": "set-key-equals-value-rejected-2",
+  "why": "The settings popup and the file show `key = value`, but typing it back fails: `set budget_day=0.10` silently opens the popup and changes nothing, and `set mode = off` / `set restyle \"pinned\"` are rejected as bad values.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "set restyle \"pinned\""
+  ],
+  "expect": [
+   "set restyle = \"pinned\""
+  ]
+ },
+ {
+  "name": "set-key-equals-value-rejected-3",
+  "why": "The settings popup and the file show `key = value`, but typing it back fails: `set budget_day=0.10` silently opens the popup and changes nothing, and `set mode = off` / `set restyle \"pinned\"` are rejected as bad values.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "set can_change = [\"colours\", \"motif\"]"
+  ],
+  "expect": [
+   "set can_change = [\"colours\", \"motif\"]"
+  ]
+ },
+ {
+  "name": "set-key-equals-value-rejected-4",
+  "why": "The settings popup and the file show `key = value`, but typing it back fails: `set budget_day=0.10` silently opens the popup and changes nothing, and `set mode = off` / `set restyle \"pinned\"` are rejected as bad values.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "set Mode OFF"
+  ],
+  "expect": [
+   "set mode = \"off\""
+  ]
+ }
+]

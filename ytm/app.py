@@ -13,13 +13,12 @@ from textual import on, work  # noqa: E402
 from textual.app import App, ComposeResult  # noqa: E402
 from textual.binding import Binding  # noqa: E402
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll  # noqa: E402
-from textual.markup import escape as _escape  # noqa: E402
 from textual.screen import ModalScreen  # noqa: E402
 from textual.widgets import Button, Input, Label, ListItem, ListView, Static  # noqa: E402
 
 from . import art, brain, context, library, search, settings, theme  # noqa: E402
 from .player import Player  # noqa: E402
-from .search import Track  # noqa: E402
+from .search import VID_RE, Track  # noqa: E402
 
 # The colours CSS ($ytm-*) and markup use, so they never depend on the terminal theme.
 # Catppuccin Mocha until the first theme; apply_theme then fills it from theme.colors().
@@ -30,7 +29,6 @@ C = dict(
 )
 
 URL_RE = re.compile(r"^(https?://)?((www|music|m)\.)?youtu(be\.com|\.be)/", re.I)
-VID_RE = re.compile(r"(?:v=|youtu\.be/)([\w-]{11})")
 # Noise YouTube adds to titles: "(Official Music Video)", "[Lyrics]", "| Lyrics" ...
 NOISE_RE = re.compile(
     r"\s*([(\[][^)\]]*\b(official|video|lyrics?|letra|audio|visuali[sz]er|oficial|4k|hd)\b[^)\]]*[)\]]|\|\s*lyrics.*)",
@@ -46,14 +44,14 @@ HELP_ROWS = [
     ("queue <song>", "add the top result to the queue"),
     ("radio <song>", "start a 50-song mix"),
     ("like", "like / unlike the song that's playing"),
-    ("save <name>", "save the whole queue as a playlist"),
+    ("save <name>", "save the queue · play save… searches"),
     ("skip · prev · pause · vol 40", "playback"),
     ("remove 3 · clear", "edit the queue"),
     ("auto", "autoplay: keep adding similar songs"),
     ("cost", "what the brain has spent (Jev + LLM)"),
     ("set · set <key> <value>", "see or change settings"),
     ("mode off · jev · yolo", "how much the brain may do"),
-    ("layout · layout <name>", "next one, or e.g. layout dashboard"),
+    ("layout · layout <name>", "pick one with a preview · ▦ cycles"),
     ("vibe · vibe calm|normal|loud", "calm: less decoration, loud: more"),
     ("quit", "exit (Ctrl+Q also works)"),
     ("", ""),
@@ -87,7 +85,7 @@ def track_parts(t: Track):
 def tidy(t: Track):
     """A Track with clean title/artist fields, for saving to likes and playlists."""
     title, artist = track_parts(t)
-    return Track(t.video_id, title, artist, t.duration)
+    return Track(t.video_id, title, artist, t.duration, t.album)
 
 
 def fmt_usd(usd):
@@ -102,7 +100,7 @@ def escape(text):
     style would leak), so it is kept out of escape() and fenced with a zero-width space."""
     core = text.rstrip("\\")
     tail = text[len(core):]
-    return _escape(core) + (tail + "\u200b" if tail else "")
+    return core.replace("[", "\\[") + (tail + "\u200b" if tail else "")  # textual's escape misses "[Remix]"
 
 
 def songs(n):
@@ -111,8 +109,21 @@ def songs(n):
 
 # commands that need an argument; bare, they show this instead of searching YouTube for the word
 USAGE = {"play": "play <song>", "radio": "radio <song>", "save": "save <playlist name>",
-         "vol": "vol <0-100>", "volume": "vol <0-100>", "remove": "remove <number in the queue>",
+         "vol": "vol <0-100> · vol +10 · vol -10", "volume": "vol <0-100> · vol +10 · vol -10", "remove": "remove <number in the queue>",
          "rm": "remove <number in the queue>", "search": "search <song>", "s": "search <song>"}
+ALONE = {"like", "skip", "next", "n", "prev", "back", "pause", "p", "clear", "quit", "exit", "cost", "help", "?"}
+ON, OFF = {"on", "1", "yes", "true", "enable"}, {"off", "0", "no", "false", "disable"}
+
+
+def is_command(cmd, arg):
+    """Whether `cmd arg` is a command, or a search that starts with a command word ("quit playing games")."""
+    if cmd in ALONE:
+        return not arg
+    if cmd in ("auto", "autoplay"):
+        return not arg or arg.lower() in ON | OFF
+    if cmd == "set":  # "set max themes 20" is a (mistyped) setting, "set fire to the rain" a song
+        return not arg or settings._closest(re.split(r"[\s=]", arg)[0], "") is not None
+    return True
 
 
 def keys(*pairs):
@@ -124,7 +135,19 @@ class Btn(Button, can_focus=False):
     """A one-line button that doesn't steal focus from the list or prompt."""
 
 
-class Row(ListItem):
+class Item(ListItem):
+    """A list row. One click only highlights it, so the row buttons (+ queue ...) act on it;
+    a double click opens it, like Enter."""
+
+    def _on_click(self, event):
+        if event.chain < 2:
+            event.prevent_default()  # ListItem's own handler would select (play) it
+            lv = self.parent
+            lv.focus()
+            lv.index = lv.children.index(self)
+
+
+class Row(Item):
     def __init__(self, track: Track, num: int, current=False, liked=False):
         title, artist = (escape(x) for x in track_parts(track))
         if current:
@@ -139,10 +162,48 @@ class Row(ListItem):
         self.track = track
 
 
-class PlaylistRow(ListItem):
+class PlaylistRow(Item):
     def __init__(self, name, count):
         super().__init__(Label(f"[{C['mauve']}]≡[/]  [b]{escape(name)}[/]  [{C['dim']}]{songs(count)}[/]"))
         self.name_ = name
+
+
+class SafePlayer:
+    """Every control reaches mpv through here, so a failed command is shown, never raised.
+    If mpv has died (or stopped reporting) it is restarted once; the queue is lost."""
+
+    def __init__(self, app):
+        self.app, self.restarted = app, False
+        self.p = Player(on_change=app._from_mpv)
+
+    def __getattr__(self, name):
+        f = getattr(self.p, name)
+        if not callable(f):
+            return f
+
+        def safe(*args):
+            try:
+                return f(*args)
+            except RuntimeError as e:
+                if not self.check():
+                    self.app.say(f"[{C['red']}]{escape(str(e))}[/]")
+        return safe
+
+    def check(self):
+        """True if mpv was found dead (and restarted, or the user was told to restart ytm)."""
+        if getattr(self.p, "alive", lambda: True)():
+            return False
+        if self.restarted:
+            self.app.say(f"[{C['red']}]player stopped: restart ytm[/]")
+            return True
+        self.restarted = True
+        self.app.say(f"[{C['red']}]player stopped, restarting[/]")
+        try:
+            self.p.close()
+            self.p = Player(on_change=self.app._from_mpv)
+        except (RuntimeError, OSError) as e:
+            self.app.say(f"[{C['red']}]player stopped: restart ytm ({escape(str(e))})[/]")
+        return True
 
 
 class HelpScreen(ModalScreen):
@@ -187,7 +248,7 @@ class PlaylistPicker(ModalScreen):
 
     def compose(self):
         with Vertical(id="box") as box:
-            box.border_title = f"add {self.what} to…"
+            box.border_title = f"add {escape(self.what)} to…"
             yield ListView(*[PlaylistRow(n, c) for n, c in self.playlists], id="pl")
             yield Input(placeholder="or type a new playlist name + enter", id="name")
 
@@ -201,6 +262,55 @@ class PlaylistPicker(ModalScreen):
     @on(Input.Submitted)
     def typed(self, event):
         self.dismiss(event.value.strip() or None)
+
+
+class LayoutPicker(ModalScreen):
+    """Pick a layout; the highlighted one is previewed behind the popup. Dismisses with a name, or None."""
+    BINDINGS = [Binding("escape", "dismiss(None)")]
+    CSS = """
+    LayoutPicker { align: center bottom; background: $ytm-crust 15%; }  /* light: the screen behind is the preview */
+    #lbox { width: 72; max-width: 100%; height: auto; max-height: 100%; background: $ytm-mantle;
+            border: round $ytm-mauve; padding: 0 1; border-title-color: $ytm-mauve; }
+    #lay { height: auto; background: $ytm-mantle; }
+    #lay > ListItem { background: $ytm-mantle; }
+    #lay > ListItem.-highlight { background: $ytm-s0; }
+    #lay Label { text-wrap: nowrap; text-overflow: ellipsis; }
+    #lhint { color: $ytm-dim; }
+    """
+
+    def __init__(self, rows, current, preview):
+        """rows: (name, description, fits the window); preview(name) shows a layout behind."""
+        super().__init__()
+        self.rows, self.current, self.preview = rows, current, preview
+
+    def compose(self):
+        items = []
+        for name, desc, fits in self.rows:
+            hi, lo = (C["blue"], C["sub"]) if fits else (C["dim"], C["dim"])
+            mark = "●" if name == self.current else " "
+            need = "" if fits else "needs a bigger window · "
+            items.append(ListItem(Label(f"{mark} [b {hi}]{name:<10}[/][{lo}]{need}{escape(desc)}[/]")))
+        index = next((i for i, r in enumerate(self.rows) if r[0] == self.current), 0)
+        with Vertical(id="lbox") as box:
+            box.border_title = "layouts"
+            yield ListView(*items, id="lay", initial_index=index)
+            yield Static("↑↓ preview · Enter keeps it · Esc puts yours back", id="lhint")
+
+    def on_mount(self):
+        self.query_one("#lay").focus()
+
+    @on(ListView.Highlighted)
+    def moved(self, event):
+        if event.list_view.index is not None:
+            self.preview(self.rows[event.list_view.index][0])
+
+    @on(ListView.Selected)
+    def chose(self, event):
+        name, _, fits = self.rows[event.list_view.index]
+        if fits:
+            self.dismiss(name)
+        else:
+            self.query_one("#lhint").update(f"{name} needs a bigger window ({DASH_MIN[0]}x{DASH_MIN[1]}) · Esc puts yours back")
 
 
 class YtmApp(App):
@@ -255,6 +365,7 @@ class YtmApp(App):
     Screen.layout-dashboard #ask:focus-within {{ border: round $ytm-pink; }}
     Screen.layout-dashboard #viz {{ display: block; }}
     Screen.layout-dashboard #log {{ display: block; height: 1fr; }}
+    Screen.layout-dashboard #msg {{ height: auto; text-wrap: wrap; }}  /* the ask panel is narrow: wrap, the log above shrinks */
     Screen.layout-dashboard #motif {{ display: none; }}
     Screen.layout-dashboard #controls {{ layout: vertical; height: 2; }}
     #viz_eq {{ height: 1fr; color: $ytm-mauve; }}
@@ -306,7 +417,7 @@ class YtmApp(App):
     Screen.tight #footer {{ margin: 0; }}
     """
     BINDINGS = [
-        Binding("ctrl+space", "pause", priority=True),
+        Binding("ctrl+space,ctrl+@", "pause", priority=True),  # Windows Terminal sends Ctrl+Space as NUL: ctrl+@
         Binding("ctrl+n", "next", priority=True),
         Binding("ctrl+b", "prev", priority=True),
         Binding("ctrl+right", "seek(10)", priority=True),
@@ -343,8 +454,12 @@ class YtmApp(App):
         self.theme_spec = theme.normalize(theme.DEFAULT)
         self.song_feats = {}       # features of the song playing (headline, blurb...)
         self._played = None        # (video id, last position, duration) for skip logging
+        self._unplayed = None      # a song loaded paused (resume): not a play until it plays
+        self._picked = set()       # parts of the look the user picked (layout, colours): restyles keep them
         self.layout = "classic"     # the layout on screen (the theme's, if the window fits it)
         self._log = []              # recent messages, shown in the dashboard's ask panel
+        self._said = -math.inf      # when the user last got a reply (automatic notes wait 5 s after it)
+        self._held = None           # the newest automatic note waiting for that
         self._phase = 0.0           # animation clock, advances only while playing
         self._bar_width = None      # #info width the bar was last drawn for
 
@@ -374,7 +489,7 @@ class YtmApp(App):
                                 with Horizontal():
                                     yield Btn("∞", id="auto", tooltip="autoplay")
                                     yield Btn("◐", id="theme", tooltip="next theme")
-                                    yield Btn("▦", id="layout", tooltip="layout: classic")
+                                    yield Btn("▦", id="layout", tooltip="next layout · type layout to pick")
                 with Vertical(id="library", classes="panel") as p:
                     p.border_title = "library"
                     with Horizontal(id="tabs"):
@@ -400,7 +515,7 @@ class YtmApp(App):
         yield Static(id="footer")
 
     def on_mount(self):
-        self.player = Player(on_change=self._from_mpv)
+        self.player = SafePlayer(self)
         self.show("history")
         self.render_now()
         self.render_controls()
@@ -420,7 +535,7 @@ class YtmApp(App):
                 self.player.command("set_property", "pause", True)
                 self.player.command("loadfile", t.url, "replace", -1, f"start={r['at']}")  # mpv ≥ 0.38
                 note = f"resume · {escape(s['title'])} at {theme.fmt(r['at'])} · press ⏯"
-                self.set_timer(2, lambda: self.say(note))  # shortcut: after the song's theme note, not ordered
+                self.set_timer(2, lambda: self.say(note, True))  # shortcut: after the song's theme note, not ordered
             except RuntimeError:
                 pass
 
@@ -429,13 +544,16 @@ class YtmApp(App):
                 self.run_worker(lambda: brain.measure_next(self.lib, self.settings) is False
                                 and self.call_from_thread(timer.stop), thread=True, group="backlog", exit_on_error=False)
         timer = self.set_interval(30, backlog)
+        if self.settings.error or self.settings.bad:  # a broken file at launch: say so, or it's silently defaults
+            self.say(escape(self.settings.error or self.settings.bad))
 
     def on_unmount(self):
-        try:  # position at quit, for resume; must never block quitting
-            vid, pos, dur = self._played
-            self.lib.log("quit", vid, at=int(pos), dur=int(dur))
-        except Exception:
-            pass
+        vid, pos, dur = self._played or (None, None, None)
+        if vid and pos is not None and dur:  # position at quit, for resume
+            try:
+                self.lib.log("quit", vid, at=int(pos), dur=int(dur))
+            except Exception:  # (sqlite) must never block quitting
+                pass
         if hasattr(self, "player"):
             self.player.close()
 
@@ -484,8 +602,11 @@ class YtmApp(App):
             if self.view == "queue":
                 self.fill_list()
             self.maybe_autofill()
-        if name == "time-pos" and self.current_id():
-            self._played = (self.current_id(), value, self.state["duration"])
+        if name in ("time-pos", "duration") and self.current_id():  # paused, time-pos can come before duration
+            self._played = (self.current_id(), self.state["time-pos"], self.state["duration"])
+        if name == "pause" and value is False and self._unplayed and self._unplayed == self.current_id():
+            self.lib.log("play", self._unplayed)
+            self._unplayed = None
         if name in ("playlist-pos", "media-title"):
             if self.current_id() != self._art_id:
                 self.song_changed()
@@ -526,7 +647,7 @@ class YtmApp(App):
         for name in theme.LAYOUTS:
             self.main.set_class(name == lay, f"layout-{name}")
         self.main.set_class(self.size.height < 28, "tight")  # panels lose their gaps
-        tip = f"layout: {lay}" + (f" ({want} needs {DASH_MIN[0]}x{DASH_MIN[1]})" if lay != want else "")
+        tip = f"next layout · type layout to pick · now {lay}" + (f" ({want} needs {DASH_MIN[0]}x{DASH_MIN[1]})" if lay != want else "")
         if self.query_one("#layout").tooltip != tip:
             self.query_one("#layout").tooltip = tip
         self.fit_art()
@@ -542,10 +663,29 @@ class YtmApp(App):
             return
         self.vibe = "normal"  # calm and loud force their own layout
         self.theme_spec = {**self.theme_spec, "layout": name}
+        self._picked.add("layout")  # sticks for the session: the next song's restyle keeps it
         self.apply_theme()
         self.lib.log("layout", self.current_id() or "", to=name)
         small = "" if self.layout == name else f" · needs {DASH_MIN[0]}x{DASH_MIN[1]}, showing {self.layout} for now"
         self.say(f"▦ {name}{small}")
+
+    def choose_layout(self):
+        """`layout` alone: a picker that previews each layout; Enter picks it like `layout <name>`."""
+        before = (self.theme_spec, self.vibe)
+
+        def preview(name):
+            fits = self.fits(name)
+            self.theme_spec, self.vibe = ({**before[0], "layout": name}, "normal") if fits else before
+            self.apply_theme()
+
+        def done(name):
+            self.theme_spec, self.vibe = before
+            if name:
+                self.pick_layout(name)  # logs it, and it sticks
+            else:
+                self.apply_theme()
+        rows = [(n, d, self.fits(n)) for n, d in theme.LAYOUTS.items()]
+        self.push_screen(LayoutPicker(rows, self.layout, preview), done)
 
     def set_vibe(self, vibe=None):
         """Instant control: calm strips decoration, loud adds it."""
@@ -579,14 +719,14 @@ class YtmApp(App):
             if not jev and not self.lib.features(vid):
                 return
             if not self.lib.features(vid):
-                self.call_from_thread(self.say, "✦ reading the song …")
+                self.call_from_thread(self.say, "✦ reading the song …", True)
             feats = brain.with_look(self.lib, vid, brain.think(self.song_dict(vid), self.lib, llm))
             if vid == self.current_id():
                 self.call_from_thread(self.show_song_theme, feats)
             if jev and next_vid and not self.lib.features(next_vid):
                 brain.think(self.song_dict(next_vid), self.lib, llm)  # ready before the song starts
         except Exception as e:  # network/API trouble: keep the current look
-            self.call_from_thread(self.say, f"brain offline: {escape(str(e))[:60]}")
+            self.call_from_thread(self.say, f"brain offline: {escape(str(e))[:60]}", True)
         finally:
             self.call_from_thread(self.render_footer)  # new spend shows up right away
 
@@ -599,7 +739,7 @@ class YtmApp(App):
             note += f" · kept {self.theme_spec['name']} ({kept})"
         else:
             self.restyle(self.theme_named(feats["theme"]))
-        self.say((f"✦ new theme grown from {brain.MIN_CLUSTER}+ similar songs · " if feats.get("new_theme") else "") + escape(note))
+        self.say((f"✦ new theme grown from {brain.MIN_CLUSTER}+ similar songs · " if feats.get("new_theme") else "") + escape(note), True)
 
     def keep_look(self, feats):
         """Why the current look stays (the restyle schedule, or stickiness), or None to switch."""
@@ -615,9 +755,11 @@ class YtmApp(App):
                 return "sticky"
         return None
 
-    def restyle(self, spec):
-        """Switch to a theme, changing only the parts the can_change setting allows."""
-        new, cur, allowed = theme.normalize(spec), self.theme_spec, self.settings["can_change"]
+    def restyle(self, spec, manual=False):
+        """Switch to a theme, changing only the parts the can_change setting allows
+        and, unless the user is the one switching, none they picked this session."""
+        new, cur = theme.normalize(spec), self.theme_spec
+        allowed = [x for x in self.settings["can_change"] if manual or x not in self._picked]
         if "colours" not in allowed:
             new["palette"] = cur["palette"]
         if "motif" not in allowed:
@@ -629,16 +771,19 @@ class YtmApp(App):
 
     def song_changed(self):
         """Log the play/skip of the previous song, then theme the new one."""
-        if self._played:
+        if self._played and self._played[0] != self._unplayed:  # never played: not a skip either
             vid, pos, dur = self._played
             if pos is not None and dur:
                 self.lib.log("skip" if pos < dur - 15 else "finish", vid, at=int(pos), dur=int(dur))
         vid = self.current_id()
-        self._played = None
+        self._played = self._unplayed = None
         self.song_feats = {}
         if not vid:
             return
-        self.lib.log("play", vid)
+        if self.state["pause"]:
+            self._unplayed = vid  # logged as a play when it starts playing
+        else:
+            self.lib.log("play", vid)
         self._songs_since += 1
         entries = self.player.playlist()
         pos = self.state["playlist-pos"] or 0
@@ -650,8 +795,10 @@ class YtmApp(App):
         if not self.is_running:
             return  # shutting down: the widgets are already being removed
         self._ticks += 1
+        if self._ticks % 8 == 0 and not self.player.restarted:  # mpv died with nobody pressing anything
+            self.player.check()
         if self._ticks % 8 == 0 and self.settings.reload():  # every 2 s: pick up hand edits
-            self.say(escape(self.settings.error) if self.settings.error else "⚙ settings reloaded")
+            self.say(escape(self.settings.error or self.settings.bad or "settings reloaded"), True)
             self.render_footer()
         self.apply_layout()  # also on resize, but the new size can arrive a moment later
         if self.query_one("#info").content_size.width != self._bar_width:
@@ -697,7 +844,9 @@ class YtmApp(App):
 
     def update_art(self):
         vid = self.current_id()
-        if vid and vid != self._art_id:
+        if not vid:
+            self._art_id = None  # queue ended: playing the same song again is a new song (song_changed)
+        elif vid != self._art_id:
             self._art_id = vid
             self.load_art(vid)
 
@@ -747,7 +896,7 @@ class YtmApp(App):
             b.display = (v != "results" or bool(self.results)) and (v != "playlist" or self.view == "playlist")
             b.set_class(v == self.view, "current")
             if v == "playlist" and self.open_playlist:
-                b.label = f"≡ {self.open_playlist}"
+                b.label = f"≡ {escape(self.open_playlist)}"
 
     def render_actions(self):
         """Show only the row buttons that make sense for the current tab."""
@@ -768,8 +917,14 @@ class YtmApp(App):
 
     def render_footer(self):
         if self.focused is self.query_one("#list"):
-            pairs = [("enter", "play"), ("a", "queue"), ("l", "like"), ("s", "playlist"),
-                     ("d", "remove"), ("←→", "tabs"), ("esc", "back")]
+            v = self.view  # only the keys that do something on this tab
+            if v == "playlists":
+                pairs = [("enter", "open"), ("a", "queue"), ("d", "delete")]
+            else:
+                pairs = [("enter", "play"), *([] if v == "queue" else [("a", "queue")]), ("l", "like"), ("s", "playlist")]
+                d = {"queue": "remove", "playlist": "remove", "liked": "unlike"}.get(v)
+                pairs += [("d", d)] if d else []
+            pairs += [("←→", "tabs"), ("esc", "back")]
         else:
             pairs = [("enter", "search"), ("tab", "list"), ("^space", "pause"), ("^n", "next"), ("?", "help")]
         _, _, why = brain.budget(self.lib, self.settings)
@@ -783,7 +938,8 @@ class YtmApp(App):
 
     def change_setting(self, cmd, arg):
         """`set` lists settings, `set key value` changes one, `mode x` = `set mode x`."""
-        key, _, value = (f"mode {arg}" if cmd == "mode" else arg).partition(" ")
+        key, _, value = re.sub(r"\s*=\s*", " ", f"mode {arg}" if cmd == "mode" else arg, count=1).partition(" ")
+        key = key.lower()  # also takes `key = value`, as the popup shows it
         if not key or not value:
             lines = []
             for k, (_, _, why) in settings.SPEC.items():
@@ -797,7 +953,7 @@ class YtmApp(App):
             self.say(escape(str(e)))
             return
         self.lib.log("setting", "", key=key, to=v)
-        self.say(f"⚙ {escape(key)} = {escape(settings._toml(v))}")
+        self.say(f"set {escape(key)} = {escape(settings._toml(v))}")  # no ⚙: Windows Terminal draws it 2 cells wide
         self.render_footer()
 
     def cost_report(self):
@@ -839,6 +995,7 @@ class YtmApp(App):
         self.call_after_refresh(setattr, lv, "index", index)  # once the new rows are mounted
         self.render_tabs()
         self.render_actions()
+        self.render_footer()
 
     def show(self, view):
         if view != self.view:
@@ -846,7 +1003,20 @@ class YtmApp(App):
         self.view = view
         self.fill_list()
 
-    def say(self, text):
+    def _show_held(self):
+        text, self._held = self._held, None
+        self.say(text, True)
+
+    def say(self, text, auto=False):
+        """Show a message. auto: a note nobody asked for, held back until the last reply is 5 s old."""
+        wait = self._said + 5 - time.monotonic()
+        if auto and wait > 0:
+            if self._held is None:  # one timer; a newer note replaces an older one, so they never swap
+                self.set_timer(wait, self._show_held)
+            self._held = text
+            return
+        if not auto:
+            self._said = time.monotonic()
         self.query_one("#msg").update(text)
         if text and text not in self._log[-1:]:
             self._log = (self._log + [text])[-20:]
@@ -893,9 +1063,9 @@ class YtmApp(App):
             new = context.rerank(self.lib, [t for t in search.radio(seed, limit=30) if t.video_id not in existing])[:10]
             if new:
                 self.call_from_thread(self.play_tracks, new, False)
-                self.call_from_thread(self.say, f"autoplay · added {len(new)} similar {'song' if len(new) == 1 else 'songs'}")
+                self.call_from_thread(self.say, f"autoplay · added {len(new)} similar {'song' if len(new) == 1 else 'songs'}", True)
         except Exception as e:
-            self.call_from_thread(self.say, f"autoplay failed: {escape(str(e))}")
+            self.call_from_thread(self.say, f"autoplay failed: {escape(str(e))}", True)
         finally:
             self.call_from_thread(setattr, self, "_filling", False)
 
@@ -910,16 +1080,15 @@ class YtmApp(App):
         """Network lookups run on a worker thread so the UI never freezes."""
         self.call_from_thread(self.say, f"searching {escape(query)} …")
         try:
-            results = search.search(query)
+            m = VID_RE.search(query) if action == "radio" and URL_RE.match(query) else None
+            results = [Track(m.group(1), query)] if m else search.search(query)  # radio <link>: seed from it
             if not results:
                 self.call_from_thread(self.say, f"no results for {escape(query)}")
                 return
             top = results[0]
             if action == "search":
                 self.results = results
-                self.call_from_thread(self.show, "results")
-                self.call_from_thread(self.say, "")
-                self.call_from_thread(self.query_one("#list").focus)
+                self.call_from_thread(self.show_results)
             elif action == "radio":
                 tracks = context.rerank(self.lib, search.radio(top.video_id) or [top], seed=top.video_id)
                 self.call_from_thread(self.play_tracks, tracks, True)
@@ -931,6 +1100,15 @@ class YtmApp(App):
                 self.call_from_thread(self.say, f"{verb} · {escape(top.label)}")
         except Exception as e:  # network errors etc. should not kill the app
             self.call_from_thread(self.say, f"[{C['red']}]error: {escape(str(e))}[/]")
+
+    def show_results(self):
+        self.show("results")
+        if not self.query_one("#library").display:  # the focus layout hides the list: never focus it hidden
+            self.pick_layout("classic")
+            self.say("▦ classic, to show results")
+        else:
+            self.say("")
+        self.call_after_refresh(self.query_one("#list").focus)
 
     # ---- likes & playlists ----
     def like(self, t: Track):
@@ -969,12 +1147,14 @@ class YtmApp(App):
             return
         cmd, _, arg = line.partition(" ")
         cmd, arg = cmd.lower(), arg.strip()
+        if not is_command(cmd, arg):
+            cmd, arg = "search", line
         p = self.player
         try:
             if cmd in ("play", "queue", "q+", "radio", "search", "s") and arg:
                 action = {"q+": "queue", "s": "search"}.get(cmd, cmd)
                 if URL_RE.match(arg) and action in ("play", "queue"):
-                    url = arg if arg.startswith("http") else "https://" + arg
+                    url = arg if arg.lower().startswith("http") else "https://" + arg
                     (p.play if action == "play" else p.queue)(url)
                 else:
                     self.do_search(arg, action)
@@ -983,21 +1163,25 @@ class YtmApp(App):
             elif cmd in USAGE and not arg:
                 self.say(f"usage: {USAGE[cmd]}")
             elif cmd in ("auto", "autoplay"):
-                self.toggle_auto(None if not arg else arg.lower() in ("on", "1", "yes"))
+                self.toggle_auto(None if not arg else arg.lower() in ON)
             elif cmd == "like":
                 t = self.current_track()
                 self.like(t) if t else self.say("nothing playing")
             elif cmd == "save" and arg:
-                n = self.lib.add_to_playlist(arg, [tidy(t) for t in self.queue_tracks()])
+                tracks = self.queue_tracks()
+                if not tracks:
+                    self.say("nothing to save · the queue is empty")
+                    return
+                n = self.lib.add_to_playlist(arg, [tidy(t) for t in tracks])
                 self.say(f"≡ saved {songs(n)} to {escape(arg)}")
             elif cmd in ("skip", "next", "n"):
-                p.next()
+                self.action_next()
             elif cmd in ("prev", "back"):
                 p.prev()
             elif cmd in ("pause", "p"):
                 p.toggle_pause()
             elif cmd in ("vol", "volume"):
-                p.set_volume(int(arg))
+                p.set_volume(int(arg) + ((self.state["volume"] or 0) if arg[:1] in ("+", "-") else 0))  # vol +10 is louder
             elif cmd in ("remove", "rm"):
                 n = int(arg)
                 if n < 1:
@@ -1014,13 +1198,13 @@ class YtmApp(App):
             elif cmd == "cost":
                 self.cost_report()
             elif cmd == "layout":
-                self.pick_layout(arg.lower() or None)
+                self.pick_layout(arg.lower()) if arg else self.choose_layout()
             elif cmd == "vibe":
                 self.set_vibe(arg.lower() or None)
             elif cmd in ("help", "?"):
                 self.action_help()
             elif URL_RE.match(line):
-                p.play(line if line.startswith("http") else "https://" + line)
+                p.play(line if line.lower().startswith("http") else "https://" + line)
             else:
                 self.do_search(line, "search")  # plain text = search
         except (ValueError, IndexError):
@@ -1043,7 +1227,7 @@ class YtmApp(App):
         elif bid == "pause":
             p.toggle_pause()
         elif bid == "next":
-            p.next()
+            self.action_next()
         elif bid == "voldown":
             p.set_volume((self.state["volume"] or 0) - 10)
         elif bid == "volup":
@@ -1054,7 +1238,8 @@ class YtmApp(App):
             names = [t["name"] for t in brain.all_themes(self.lib)]
             cur = self.theme_spec["name"]
             nxt = names[(names.index(cur) + 1) % len(names)] if cur in names else names[0]
-            self.restyle(self.theme_named(nxt))
+            self.restyle(self.theme_named(nxt), manual=True)
+            self._picked.add("colours")
             self.lib.log("theme_cycle", self.current_id() or "", to=nxt)
             self.say(f"◐ {escape(nxt)}")
         elif bid == "layout":  # instant: next layout that fits the window
@@ -1114,6 +1299,10 @@ class YtmApp(App):
             elif self.view == "playlist":
                 self.lib.remove_from_playlist(self.open_playlist, t.video_id)
                 self.fill_list()
+            elif self.view == "liked":
+                self.like(t)  # unlike
+            else:
+                self.say("d removes from the queue or a playlist")
 
     def action_tab(self, step):
         if self.focused is not self.query_one("#list"):
@@ -1123,7 +1312,7 @@ class YtmApp(App):
         self.show(names[(names.index(cur) + step) % len(names)])
 
     def action_help(self):
-        if not isinstance(self.screen, (HelpScreen, PlaylistPicker)):
+        if not isinstance(self.screen, (HelpScreen, PlaylistPicker, LayoutPicker)):
             self.push_screen(HelpScreen())
 
     # ---- hotkeys ----
@@ -1131,7 +1320,8 @@ class YtmApp(App):
         self.player.toggle_pause()
 
     def action_next(self):
-        self.player.next()
+        if self.player.next() is False:
+            self.say("end of queue")
 
     def action_prev(self):
         self.player.prev()

@@ -11,6 +11,8 @@ end
 mp.register_event("file-loaded", function()
     local url = mp.get_property("path", "")
     if url == "" or url == last then return end
+    -- ytm's resume loads the song with start=<pos>: it's the same play, logged last session
+    if mp.get_property("file-local-options/start", "none") ~= "none" then return end
     last = url
     local f = io.open(path, "ab")
     if not f then return end

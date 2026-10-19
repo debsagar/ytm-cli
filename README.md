@@ -80,6 +80,7 @@ Each song gets a theme: colours, a scrolling motif, a progress-bar style and one
 | ![classic layout](docs/layout-classic.png) | ![focus layout](docs/layout-focus.png) |
 
 - **◐ theme** cycles through every theme.
+- **▦** cycles the layouts; type `layout` to see them all and pick one, previewed as you move (Esc puts yours back).
 - **vibe** switches between calm (focus layout, no decoration), normal and loud (stage layout).
 
 Without the optional brain (below), songs keep the default look; both buttons still work.
@@ -120,7 +121,7 @@ Type `set` to see every setting and `set <key> <value>` to change one (`mode off
 
 ### Updating
 
-`ytm update` moves your copy to the latest release and installs any new Python packages. Your library, history and settings live outside the code and are not touched. If you've edited files in that folder, git refuses and nothing changes.
+`ytm update` moves your copy to the latest release and installs any new Python packages. Your library and history are not touched: they live in the code folder's `data` and `mpv\history.tsv`, which git ignores, unless a `ytm.home` file or `YTM_HOME` points elsewhere. Your settings live in `%USERPROFILE%\.config\ytm`. If you've edited the code's own files, git refuses and nothing changes.
 
 **Channels.** `stable` is the `main` branch, which the installer gives you. `dev` gets the latest features first and may have bugs. `ytm update dev` switches your copy to dev, `ytm update stable` switches it back (code and packages; your data and settings stay as they are). After that, a plain `ytm update` keeps following the channel you're on.
 

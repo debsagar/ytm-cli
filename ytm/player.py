@@ -127,7 +127,12 @@ class Player:
         self._evt = _open_pipe(self.pipe)
         for i, name in enumerate(WATCHED, 1):
             self._evt.write((json.dumps({"command": ["observe_property", i, name]}) + "\n").encode())
-        threading.Thread(target=self._event_loop, daemon=True).start()
+        self._events = threading.Thread(target=self._event_loop, daemon=True)
+        self._events.start()
+
+    def alive(self):
+        """False once mpv has exited or stopped reporting changes."""
+        return self.proc.poll() is None and self._events.is_alive()
 
     @staticmethod
     def _lines(f):
@@ -154,12 +159,15 @@ class Player:
         """Send one mpv command and return its result (raises on error)."""
         with self._lock:
             rid = next(self._ids)
-            self._cmd.write((json.dumps({"command": list(args), "request_id": rid}) + "\n").encode())
-            for msg in self._cmd_reader:
-                if msg.get("request_id") == rid:
-                    if msg.get("error") != "success":
-                        raise RuntimeError(f"mpv: {msg.get('error')} for {args}")
-                    return msg.get("data")
+            try:
+                self._cmd.write((json.dumps({"command": list(args), "request_id": rid}) + "\n").encode())
+                for msg in self._cmd_reader:
+                    if msg.get("request_id") == rid:
+                        if msg.get("error") != "success":
+                            raise RuntimeError(f"mpv: {msg.get('error')} for {args}")
+                        return msg.get("data")
+            except OSError as e:  # mpv died: the pipe is gone
+                raise RuntimeError(f"mpv stopped ({e})") from None
             raise RuntimeError("mpv closed the pipe")
 
     def get(self, prop):
@@ -171,15 +179,25 @@ class Player:
     # ---- playback ----
     def play(self, url):
         self.command("loadfile", url, "replace")
+        self.command("set_property", "pause", False)  # play now, even after a paused resume
 
     def queue(self, url):
         self.command("loadfile", url, "append-play")
 
     def next(self):
+        """Returns False on the last song: mpv would stop and go idle with nothing to play."""
+        pos, count = self.get("playlist-pos"), self.get("playlist-count") or 0
+        if pos is not None and pos + 1 >= count:
+            return False
         self.command("playlist-next", "force")
+        return True
 
     def prev(self):
-        self.command("playlist-prev", "force")
+        pos = self.get("playlist-pos")
+        if pos == 0:  # the first song restarts (playlist-prev would leave mpv idle)
+            self.command("seek", 0, "absolute")
+        elif pos is not None and pos > 0:  # idle (-1): nothing playing to go back from
+            self.command("playlist-prev", "force")
 
     def toggle_pause(self):
         self.command("cycle", "pause")

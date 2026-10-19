@@ -1,0 +1,14 @@
+[
+ {
+  "why": "PlaylistPicker's border_title puts the raw song title into markup, so a bracketed part ('[Remix]', '[Live]') vanishes: 'add “Song ” to…'.",
+  "songs": [{"id": "aaaaaaaaaaa", "title": "Song [Remix]", "artist": "A"}],
+  "steps": ["queue", {"key": "tab"}, {"key": "s"}],
+  "expect": ["add “Song [Remix]” to"]
+ },
+ {
+  "why": "Same border_title: a title containing '[/]' raises MarkupError and the app crashes when you press s / ≡ playlist.",
+  "songs": [{"id": "aaaaaaaaaaa", "title": "x [/] y", "artist": "A"}],
+  "steps": ["queue", {"key": "tab"}, {"key": "s"}],
+  "expect": ["add “x [/] y” to"]
+ }
+]
