@@ -476,7 +476,7 @@ class YtmApp(App):
             title, artist = track_parts(t)
         else:
             title, artist = split_label(self.state["media-title"] or "")
-        return {"id": vid, "title": title, "artist": artist}
+        return {"id": vid, "title": title, "artist": artist, "album": t.album if t else ""}
 
     @work(thread=True, exclusive=True, group="brain")
     def think(self, vid, next_vid=None):
