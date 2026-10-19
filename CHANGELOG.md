@@ -4,10 +4,25 @@ All notable changes to this project are documented here. Versions follow [Semant
 
 ## [Unreleased]
 
+### Added
+- `layout` opens a layout picker: each layout with its description, the current one marked, ones too big for the window dimmed; moving the highlight previews it, Enter keeps it, Esc puts yours back. ▦ still cycles.
+
+### Fixed
+- A search that starts with a command word ("quit playing games", "save your tears", "p diddy") searches instead of running the command.
+- `set`: suggests the right key for a wrong one, accepts `key = value`, quotes, lists and any case, and never overwrites a `settings.toml` that has a syntax error. Bad values in the file are reported per key instead of silently ignored.
+- Replies stay visible for at least 5 s before an automatic note replaces them.
+- ⏮ on the first song restarts it and ⏭ on the last says "end of queue", instead of stopping playback for good.
+- Player errors (seeking with nothing loaded, mpv dying) show a message and restart mpv once, instead of crashing the app.
+- Resume keeps its point when you quit before pressing play; a paused resume load no longer counts as a play.
+- Likes and playlists keep the album; `youtu.be` plays show up in History; replaying the song that just ended counts as a new play.
+- One click highlights a list row, a double click plays it. Ctrl+Space pauses in Windows Terminal.
+- A layout or colours picked by hand stick for the session. Search in the focus layout switches to classic to show results.
+- Song titles and playlist names with `[...]` show correctly (some crashed the app). The footer only offers list keys that work on the current tab; `d` unlikes on the liked tab.
+- `vol +10` / `vol -10` are relative; `save` with an empty queue creates nothing; `radio <link>` works; links typed in capitals play.
+
 ## [0.5.2] - 2026-10-19
 
 ### Added
-- `layout` opens a layout picker: each layout with its description, the current one marked, ones too big for the window dimmed; moving the highlight previews it, Enter keeps it, Esc puts yours back. ▦ still cycles.
 - One-command install: `irm https://raw.githubusercontent.com/debsagar/ytm-cli/main/install.ps1 | iex` installs missing dependencies with winget, clones ytm into `%LOCALAPPDATA%\ytm`, sets up its packages and adds the `ytm` command. Running it again updates.
 - Update channels: `stable` (the `main` branch) and `dev` (latest features). `ytm update dev` switches your copy to dev and `ytm update stable` takes it back, packages included; `ytm update` follows the channel you're on. Data and settings are never touched.
 
