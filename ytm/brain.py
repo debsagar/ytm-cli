@@ -15,7 +15,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-from . import settings, theme
+from . import context, settings, theme
 
 SECRETS = Path.home() / ".config" / "ytm" / "secrets.env"
 JEV_URL = "https://api.typesafe.ai/v1/systemone"
@@ -197,7 +197,8 @@ def grow(lib, themes):
         if len(group) >= MIN_CLUSTER:
             songs = [s for s in (lib.song(o) for o, _ in group) if s]
             measured = describe([song_vec(g) for _, g in group])
-            spec = write_theme({"songs": songs, "measured": measured}, lib.profile(), [t["name"] for t in themes], lib)
+            spec = write_theme({"songs": songs, "measured": measured}, context.slice_for("theme", lib, ids=[o for o, _ in group]),
+                                 [t["name"] for t in themes], lib)
             if not spec or spec["name"] in {t["name"] for t in themes}:
                 return None
             vs = [song_vec(g) for _, g in group]
