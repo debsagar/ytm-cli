@@ -1,0 +1,191 @@
+"""Theme specs: the small JSON "language" that describes how the player looks.
+
+Both the LLM and the instant controls produce the same spec; the app only ever
+draws from the primitives below, so any spec (even a broken one) renders safely.
+
+  {
+    "name": "pit lane",
+    "palette": {"bg": "#0b0b0b", "panel": "#161616", "accent": "#e10600", "accent2": "#ffffff",
+                "text": "#f2f2f2", "dim": "#7a7a7a"},
+    "motif": "checkered",               # one of MOTIFS
+    "progress": {"style": "track", "cursor": "🏎", "label": "LAP {lap}/{laps}"},
+    "headline": "Lights out and away we go",
+    "blurb": "From F1: The Movie (2025)"
+  }
+"""
+
+import re
+
+HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+# A short pattern repeated across the top of the now-playing panel.
+MOTIFS = {
+    "none": "",
+    "checkered": "▚▞",
+    "waves": "∿~",
+    "stars": "✦ · ✧ · ",
+    "rain": "╎ ¦ ",
+    "dots": "· ",
+    "grid": "┼─",
+    "hearts": "♥ ♡ ",
+    "flames": "▲▴^▵",
+    "vinyl": "◉ ○ ",
+    "zigzag": "╱╲",
+    "blocks": "▁▂▃▅▇▅▃▂",
+    "notes": "♪ ♫ ♬ ",
+    "leaves": "❦ ❧ ",
+    "circuit": "─┬─┴",
+    "sun": "☼ ",
+}
+
+# Progress bar styles: (filled char, empty char, default cursor)
+PROGRESS = {
+    "line": ("━", "━", ""),
+    "track": ("═", "─", "●"),
+    "dots": ("●", "·", ""),
+    "blocks": ("█", "░", ""),
+    "wave": ("≋", "∼", ""),
+    "thin": ("─", "─", "◆"),
+}
+
+VIBES = ["calm", "normal", "loud"]
+
+DEFAULT = {
+    "name": "default", "for": "neutral fallback: songs with no strong mood or setting",
+    "palette": {"bg": "#1e1e2e", "panel": "#181825", "accent": "#cba6f7", "accent2": "#f5c2e7",
+                "text": "#cdd6f4", "dim": "#6c7086"},
+    "motif": "none",
+    "progress": {"style": "line", "cursor": "", "label": "{pos} / {dur}"},
+    "headline": "",
+    "blurb": "",
+}
+
+# The 12 seed themes. Each is a cluster centre: "centre" describes the typical song
+# (energy 0..1, mood weights, context tags) in the same terms Jev measures songs.
+def _t(name, for_, centre, bg, panel, accent, accent2, text, dim, motif, style, cursor="", label="{pos} / {dur}"):
+    return {"name": name, "for": for_, "centre": centre, "motif": motif,
+            "palette": {"bg": bg, "panel": panel, "accent": accent, "accent2": accent2, "text": text, "dim": dim},
+            "progress": {"style": style, "cursor": cursor, "label": label}}
+
+
+PRESETS = [
+    _t("neon rave", "euphoric club and dance music", {"energy": .9, "mood": {"euphoric": 1}, "tags": ["club"]},
+       "#0b0716", "#130b24", "#ff3cac", "#2bd2ff", "#f3eaff", "#7a6a99", "blocks", "blocks"),
+    _t("pit wall", "motorsport, racing and speed", {"energy": .8, "mood": {"aggressive": 1}, "tags": ["motorsport", "soundtrack"]},
+       "#0d0d10", "#1a1a20", "#ff2d2d", "#ffd400", "#f2f2f2", "#6b6b78", "checkered", "track", "🏎", "LAP {lap}/{laps}  {pos}"),
+    _t("dream haze", "dreamy, hazy, psychedelic indie", {"energy": .3, "mood": {"dreamy": 1}, "tags": []},
+       "#1d1730", "#161126", "#c8a2ff", "#ffb3d9", "#efe6ff", "#7f72a3", "stars", "wave"),
+    _t("desi street", "high-energy South Asian rap and hip-hop", {"energy": .75, "mood": {"aggressive": 1}, "tags": ["south_asian"]},
+       "#1a1208", "#120c05", "#ff9933", "#19c37d", "#fff3e0", "#8a7458", "zigzag", "dots"),
+    _t("desi soul", "soft, emotional South Asian songs", {"energy": .35, "mood": {"melancholic": .5, "romantic": .5}, "tags": ["south_asian"]},
+       "#220f14", "#180a0e", "#e8b04b", "#d9466f", "#fbe9dc", "#8d6a6f", "notes", "thin", "◆"),
+    _t("dark techno", "dark, heavy, peak-time club music", {"energy": .9, "mood": {"dark": 1}, "tags": ["club"]},
+       "#0a0a0a", "#050505", "#e0e0e0", "#ff1f3d", "#d8d8d8", "#5c5c5c", "grid", "blocks", "", "{pct}%"),
+    _t("velvet", "romantic, sensual, slow-burning songs", {"energy": .4, "mood": {"romantic": 1}, "tags": []},
+       "#1f0d16", "#16090f", "#ff6f91", "#ffc2d1", "#ffe8ee", "#8f6574", "hearts", "thin", "♥"),
+    _t("retro tape", "nostalgic, retro, throwback songs", {"energy": .55, "mood": {"nostalgic": 1}, "tags": []},
+       "#1c1712", "#14100c", "#f4a259", "#5bc0be", "#f6efe6", "#857565", "vinyl", "line"),
+    _t("gold rush", "hype rap, swagger and bangers", {"energy": .85, "mood": {"aggressive": 1}, "tags": []},
+       "#0f0c06", "#0a0804", "#ffd166", "#ef476f", "#fff6dc", "#857a5c", "flames", "track", "●"),
+    _t("campfire", "acoustic, folk and soft singer-songwriter", {"energy": .2, "mood": {"melancholic": .5, "happy": .5}, "tags": []},
+       "#1b2420", "#141b18", "#a6e3a1", "#f9e2af", "#e2efe6", "#6f8577", "leaves", "dots"),
+    _t("cinema", "film and game soundtracks, epic and dramatic", {"energy": .6, "mood": {"dark": .5, "euphoric": .5}, "tags": ["soundtrack"]},
+       "#0b1020", "#070b17", "#4ea8de", "#ffd166", "#e8eefc", "#5f6b8a", "dots", "thin", "◆"),
+    _t("sunny day", "happy, upbeat, feel-good pop", {"energy": .65, "mood": {"happy": 1}, "tags": []},
+       "#1c1a10", "#15130b", "#ffd23f", "#3bceac", "#fffbea", "#8c8660", "sun", "wave"),
+    _t("rainy window", "sad, melancholic, late-night songs", {"energy": .25, "mood": {"melancholic": 1}, "tags": []},
+       "#10151c", "#0b0f14", "#7aa2c7", "#b8c7d9", "#e3ebf3", "#5d6b7a", "rain", "thin"),
+]
+# The neutral look before anything plays (not a cluster).
+DEFAULT_NAME = DEFAULT["name"]
+
+
+def _hex(c, fallback):
+    return c if isinstance(c, str) and HEX.match(c) else fallback
+
+
+def _mix(a, b, t):
+    """Blend two #rrggbb colours: t=0 gives a, t=1 gives b."""
+    ca = [int(a[i:i + 2], 16) for i in (1, 3, 5)]
+    cb = [int(b[i:i + 2], 16) for i in (1, 3, 5)]
+    return "#" + "".join(f"{round(x + (y - x) * t):02x}" for x, y in zip(ca, cb))
+
+
+def normalize(spec):
+    """Return a complete, safe theme: unknown or missing fields fall back to the default."""
+    spec = spec if isinstance(spec, dict) else {}
+    pal_in = spec.get("palette") if isinstance(spec.get("palette"), dict) else {}
+    palette = {k: _hex(pal_in.get(k), v) for k, v in DEFAULT["palette"].items()}
+    prog_in = spec.get("progress") if isinstance(spec.get("progress"), dict) else {}
+    style = prog_in.get("style") if prog_in.get("style") in PROGRESS else "line"
+    return {
+        "name": str(spec.get("name") or "untitled")[:30],
+        "for": str(spec.get("for") or "")[:200],
+        "palette": palette,
+        "motif": spec.get("motif") if spec.get("motif") in MOTIFS else "none",
+        "progress": {
+            "style": style,
+            "cursor": str(prog_in.get("cursor") or PROGRESS[style][2])[:2],
+            "label": str(prog_in.get("label") or "{pos} / {dur}")[:30],
+        },
+        "headline": str(spec.get("headline") or "")[:80],
+        "blurb": str(spec.get("blurb") or "")[:160],
+        **{k: spec[k] for k in ("centre", "vec") if k in spec},  # cluster position, kept as-is
+    }
+
+
+def colors(theme):
+    """The full colour set the UI uses, derived from the theme's six colours."""
+    p = theme["palette"]
+    return {
+        "base": p["bg"], "mantle": p["panel"], "crust": _mix(p["panel"], "#000000", 0.35),
+        "s0": _mix(p["bg"], p["text"], 0.10), "s1": _mix(p["bg"], p["text"], 0.22),
+        "dim": p["dim"], "sub": _mix(p["text"], p["dim"], 0.45), "text": p["text"],
+        "mauve": p["accent"], "pink": p["accent2"], "blue": p["accent"], "green": p["accent2"],
+        "peach": p["accent2"], "red": "#f38ba8",
+    }
+
+
+def apply_vibe(theme, vibe):
+    """Instant control: calm strips decoration, loud adds it."""
+    t = {**theme, "progress": dict(theme["progress"])}
+    if vibe == "calm":
+        t["motif"] = "none"
+        t["blurb"] = ""
+        t["progress"]["cursor"] = ""
+    elif vibe == "loud" and t["motif"] == "none":
+        t["motif"] = "notes"
+    return t
+
+
+def motif_line(theme, width):
+    pat = MOTIFS.get(theme["motif"], "")
+    if not pat or width <= 0:
+        return ""
+    return (pat * (width // len(pat) + 1))[:width]
+
+
+def fmt(s):
+    if s is None:
+        return "-:--"
+    s = int(s)
+    return f"{s // 60}:{s % 60:02d}"
+
+
+def progress_label(theme, pos, dur):
+    pct = int(100 * pos / dur) if pos and dur else 0
+    laps = 4
+    lap = min(laps, int(laps * pos / dur) + 1) if pos and dur else 1
+    try:
+        return theme["progress"]["label"].format(pos=fmt(pos), dur=fmt(dur), pct=pct, lap=lap, laps=laps)
+    except (KeyError, IndexError, ValueError):
+        return f"{fmt(pos)} / {fmt(dur)}"
+
+
+def progress_bar(theme, width, pos, dur):
+    """(filled, cursor, empty) strings for a bar `width` cells wide."""
+    full, empty, _ = PROGRESS[theme["progress"]["style"]]
+    cursor = theme["progress"]["cursor"]
+    width = max(4, width - len(cursor))
+    filled = int(width * pos / dur) if pos and dur else 0
+    return full * filled, cursor, empty * (width - filled)

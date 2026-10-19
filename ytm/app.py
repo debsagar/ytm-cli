@@ -15,7 +15,7 @@ from textual.markup import escape  # noqa: E402
 from textual.screen import ModalScreen  # noqa: E402
 from textual.widgets import Button, Input, Label, ListItem, ListView, Static  # noqa: E402
 
-from . import art, library, search  # noqa: E402
+from . import art, brain, library, search, theme  # noqa: E402
 from .player import Player  # noqa: E402
 from .search import Track  # noqa: E402
 
@@ -121,9 +121,9 @@ class PlaylistRow(ListItem):
 class HelpScreen(ModalScreen):
     BINDINGS = [Binding("escape,question_mark,q,enter", "dismiss")]
     CSS = f"""
-    HelpScreen {{ align: center middle; background: {C['crust']} 70%; }}
-    #help {{ width: 72; height: auto; background: {C['mantle']}; border: round {C['mauve']};
-             padding: 1 2; border-title-color: {C['mauve']}; }}
+    HelpScreen {{ align: center middle; background: $ytm-crust 70%; }}
+    #help {{ width: 72; height: auto; background: $ytm-mantle; border: round $ytm-mauve;
+             padding: 1 2; border-title-color: $ytm-mauve; }}
     """
 
     def compose(self):
@@ -137,13 +137,13 @@ class PlaylistPicker(ModalScreen):
     """Pick an existing playlist or type a new name. Dismisses with the name, or None."""
     BINDINGS = [Binding("escape", "dismiss(None)")]
     CSS = f"""
-    PlaylistPicker {{ align: center middle; background: {C['crust']} 70%; }}
-    #box {{ width: 50; height: auto; max-height: 20; background: {C['mantle']};
-            border: round {C['mauve']}; padding: 1 2; border-title-color: {C['mauve']}; }}
-    #pl {{ height: auto; max-height: 10; background: {C['mantle']}; }}
-    #pl > ListItem.-highlight {{ background: {C['s0']}; }}
-    #name {{ margin-top: 1; border: round {C['s1']}; background: {C['base']}; }}
-    #name:focus {{ border: round {C['mauve']}; }}
+    PlaylistPicker {{ align: center middle; background: $ytm-crust 70%; }}
+    #box {{ width: 50; height: auto; max-height: 20; background: $ytm-mantle;
+            border: round $ytm-mauve; padding: 1 2; border-title-color: $ytm-mauve; }}
+    #pl {{ height: auto; max-height: 10; background: $ytm-mantle; }}
+    #pl > ListItem.-highlight {{ background: $ytm-s0; }}
+    #name {{ margin-top: 1; border: round $ytm-s1; background: $ytm-base; }}
+    #name:focus {{ border: round $ytm-mauve; }}
     """
 
     def __init__(self, playlists, what):
@@ -172,49 +172,51 @@ class YtmApp(App):
     TITLE = "ytm"
     ENABLE_COMMAND_PALETTE = False
     CSS = f"""
-    Screen {{ background: {C['base']}; color: {C['text']}; }}
+    Screen {{ background: $ytm-base; color: $ytm-text; }}
 
-    #now {{ height: auto; background: {C['mantle']}; padding: 1 2; }}
-    #art {{ width: {ART_W}; height: {ART_H}; margin-right: 2; color: {C['s1']}; }}
+    #now {{ height: auto; background: $ytm-mantle; padding: 1 2; }}
+    #art {{ width: {ART_W}; height: {ART_H}; margin-right: 2; color: $ytm-s1; }}
     #info {{ height: auto; }}
-    #title {{ color: {C['pink']}; text-style: bold; }}
-    #artist {{ color: {C['sub']}; }}
+    #title {{ color: $ytm-pink; text-style: bold; }}
+    #motif {{ color: $ytm-mauve; height: 1; }}
+    #headline {{ color: $ytm-mauve; text-style: italic; height: auto; }}
+    #artist {{ color: $ytm-sub; }}
     #bar {{ margin-top: 1; }}
     #title, #artist, #list Label {{ text-wrap: nowrap; text-overflow: ellipsis; }}
 
     Btn {{ height: 1; min-width: 3; width: auto; border: none; padding: 0 1; margin-right: 1;
-           background: {C['s0']}; color: {C['text']}; text-style: none; }}
-    Btn:hover {{ background: {C['s1']}; }}
-    Btn.-active {{ background: {C['s0']}; }}
+           background: $ytm-s0; color: $ytm-text; text-style: none; }}
+    Btn:hover {{ background: $ytm-s1; }}
+    Btn.-active {{ background: $ytm-s0; }}
     #controls {{ height: 1; margin-top: 1; }}
-    #controls .big {{ background: {C['mauve']}; color: {C['crust']}; text-style: bold; }}
-    #controls .big:hover {{ background: {C['pink']}; }}
-    #like_now.on, #r_like.on {{ color: {C['pink']}; }}
-    #auto.on {{ color: {C['green']}; }}
+    #controls .big {{ background: $ytm-mauve; color: $ytm-crust; text-style: bold; }}
+    #controls .big:hover {{ background: $ytm-pink; }}
+    #like_now.on, #r_like.on {{ color: $ytm-pink; }}
+    #auto.on {{ color: $ytm-green; }}
 
     #tabs {{ height: 1; padding: 0 1; margin-top: 1; }}
-    #tabs Btn {{ background: {C['base']}; color: {C['dim']}; margin-right: 0; }}
-    #tabs Btn:hover {{ color: {C['text']}; }}
-    #tabs Btn.current {{ background: {C['mauve']}; color: {C['crust']}; text-style: bold; }}
+    #tabs Btn {{ background: $ytm-base; color: $ytm-dim; margin-right: 0; }}
+    #tabs Btn:hover {{ color: $ytm-text; }}
+    #tabs Btn.current {{ background: $ytm-mauve; color: $ytm-crust; text-style: bold; }}
 
     #actions {{ height: 1; padding: 0 1; margin-top: 1; }}
-    #actions Btn {{ background: {C['base']}; color: {C['blue']}; border: none; }}
-    #actions Btn:hover {{ background: {C['s0']}; }}
-    #actions #r_rm {{ color: {C['red']}; }}
+    #actions Btn {{ background: $ytm-base; color: $ytm-blue; border: none; }}
+    #actions Btn:hover {{ background: $ytm-s0; }}
+    #actions #r_rm {{ color: $ytm-red; }}
 
-    #list {{ height: 1fr; background: {C['base']}; padding: 0 1;
-             scrollbar-size-vertical: 1; scrollbar-color: {C['s1']}; scrollbar-background: {C['base']}; }}
-    #list > ListItem {{ background: {C['base']}; }}
-    #list > ListItem.-highlight {{ background: {C['mantle']}; }}
-    #list:focus > ListItem.-highlight {{ background: {C['s0']}; }}
+    #list {{ height: 1fr; background: $ytm-base; padding: 0 1;
+             scrollbar-size-vertical: 1; scrollbar-color: $ytm-s1; scrollbar-background: $ytm-base; }}
+    #list > ListItem {{ background: $ytm-base; }}
+    #list > ListItem.-highlight {{ background: $ytm-mantle; }}
+    #list:focus > ListItem.-highlight {{ background: $ytm-s0; }}
 
-    #msg {{ height: 1; padding: 0 2; color: {C['peach']}; }}
-    #prompt {{ height: 3; margin: 0 1; background: {C['mantle']}; color: {C['text']};
-               border: round {C['s1']}; padding: 0 1; }}
-    #prompt:focus {{ border: round {C['mauve']}; }}
-    #prompt > .input--placeholder {{ color: {C['dim']}; }}
-    #prompt > .input--cursor {{ background: {C['mauve']}; color: {C['crust']}; }}
-    #footer {{ height: 1; padding: 0 2; background: {C['crust']}; }}
+    #msg {{ height: 1; padding: 0 2; color: $ytm-peach; }}
+    #prompt {{ height: 3; margin: 0 1; background: $ytm-mantle; color: $ytm-text;
+               border: round $ytm-s1; padding: 0 1; }}
+    #prompt:focus {{ border: round $ytm-mauve; }}
+    #prompt > .input--placeholder {{ color: $ytm-dim; }}
+    #prompt > .input--cursor {{ background: $ytm-mauve; color: $ytm-crust; }}
+    #footer {{ height: 1; padding: 0 2; background: $ytm-crust; }}
     """
     BINDINGS = [
         Binding("ctrl+space", "pause", priority=True),
@@ -246,13 +248,19 @@ class YtmApp(App):
         self._filling = False
         self._art_id = None
         self.lib = library.Library()
+        self.vibe = "normal"
+        self.theme_spec = theme.normalize(theme.DEFAULT)
+        self.song_feats = {}       # features of the song playing (headline, blurb...)
+        self._played = None        # (video id, last position, duration) for skip logging
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="now"):
             yield Static("", id="art")
             with Vertical(id="info"):
+                yield Static(id="motif")
                 yield Static(id="title")
                 yield Static(id="artist")
+                yield Static(id="headline")
                 yield Static(id="bar")
                 with Horizontal(id="controls"):
                     yield Btn("⏮", id="prev")
@@ -262,6 +270,8 @@ class YtmApp(App):
                     yield Btn("vol −", id="voldown")
                     yield Btn("vol +", id="volup")
                     yield Btn("∞ auto", id="auto")
+                    yield Btn("◐ theme", id="theme")
+                    yield Btn("vibe", id="vibe")
         with Horizontal(id="tabs"):
             for v in TABS + ["playlist"]:
                 yield Btn(v, id=f"t_{v}")
@@ -313,12 +323,84 @@ class YtmApp(App):
             if self.view == "queue":
                 self.fill_list()
             self.maybe_autofill()
+        if name == "time-pos" and self.current_id():
+            self._played = (self.current_id(), value, self.state["duration"])
         if name in ("playlist-pos", "media-title"):
+            if self.current_id() != self._art_id:
+                self.song_changed()
             self.update_art()
             self.render_controls()
         if name == "pause":
             self.render_controls()
         self.render_now()
+
+    # ---- themes: the brain proposes, instant controls adjust ----
+    def get_css_variables(self):
+        return {**super().get_css_variables(), **{f"ytm-{k}": v for k, v in C.items()}}
+
+    def apply_theme(self, spec=None):
+        if spec is not None:
+            self.theme_spec = theme.normalize(spec)
+        t = theme.apply_vibe(self.theme_spec, self.vibe)
+        C.update(theme.colors(t))
+        self.refresh_css()
+        self.fill_list()
+        self.render_footer()
+        self.render_now()
+
+    def library_themes(self):
+        return theme.PRESETS + self.lib.themes()
+
+    def theme_named(self, name):
+        return next((t for t in self.library_themes() if t["name"] == name), theme.DEFAULT)
+
+    def song_dict(self, vid):
+        t = self.known.get(vid)
+        if t:
+            title, artist = track_parts(t)
+        else:
+            title, artist = split_label(self.state["media-title"] or "")
+        return {"id": vid, "title": title, "artist": artist}
+
+    @work(thread=True, exclusive=True, group="brain")
+    def think(self, vid, next_vid=None):
+        """Judge the current song (and prefetch the next one) on a worker thread."""
+        if not brain.enabled():
+            return
+        try:
+            if not self.lib.features(vid):
+                self.call_from_thread(self.say, "✦ reading the song …")
+            feats = brain.think(self.song_dict(vid), self.lib)
+            if vid == self.current_id():
+                self.call_from_thread(self.show_song_theme, feats)
+            if next_vid and not self.lib.features(next_vid):
+                brain.think(self.song_dict(next_vid), self.lib)  # ready before the song starts
+        except Exception as e:  # network/API trouble: keep the current look
+            self.call_from_thread(self.say, f"brain offline: {escape(str(e))[:60]}")
+
+    def show_song_theme(self, feats):
+        self.song_feats = feats
+        tags = " · ".join(feats.get("tags", []))
+        note = f"{feats['theme']} · {feats['mood']} · energy {int(feats['energy'] * 100)}%" + (f" · {tags}" if tags else "")
+        self.say((f"✦ new theme grown from {brain.MIN_CLUSTER}+ similar songs · " if feats.get("new_theme") else "") + escape(note))
+        self.apply_theme(self.theme_named(feats["theme"]))
+
+    def song_changed(self):
+        """Log the play/skip of the previous song, then theme the new one."""
+        if self._played:
+            vid, pos, dur = self._played
+            if pos is not None and dur:
+                self.lib.log("skip" if pos < dur - 15 else "finish", vid, at=int(pos), dur=int(dur))
+        vid = self.current_id()
+        self._played = None
+        self.song_feats = {}
+        if not vid:
+            return
+        self.lib.log("play", vid)
+        entries = self.player.playlist()
+        pos = self.state["playlist-pos"] or 0
+        nxt = VID_RE.search(entries[pos + 1].get("filename", "")) if pos + 1 < len(entries) else None
+        self.think(vid, nxt.group(1) if nxt else None)
 
     # ---- the song that's playing ----
     def current_id(self):
@@ -364,13 +446,20 @@ class YtmApp(App):
             title, artist = "Nothing playing", "search for a song below to start"
         self.query_one("#title").update(escape(title))
         self.query_one("#artist").update(escape(artist))
+        t = theme.apply_vibe(self.theme_spec, self.vibe)
+        width = self.query_one("#info").content_size.width
+        self.query_one("#motif").update(escape(theme.motif_line(t, width)))
+        f = self.song_feats
+        line = " — ".join(x for x in (f.get("headline"), f.get("blurb") if self.vibe != "calm" else "") if x)
+        self.query_one("#headline").update(escape(line))
+        self.query_one("#headline").display = bool(line)
 
         pos, dur = s["time-pos"], s["duration"]
-        right = f"  {fmt_time(pos)} / {fmt_time(dur)}   vol {int(s['volume'] or 0)}%"
-        width = max(10, self.query_one("#info").content_size.width - len(right))
-        filled = int(width * pos / dur) if pos and dur else 0
+        right = f"  {theme.progress_label(t, pos, dur)}   vol {int(s['volume'] or 0)}%"
+        full, cursor, empty = theme.progress_bar(t, max(10, width - len(right)), pos, dur)
         self.query_one("#bar").update(
-            f"[{C['mauve']}]{'━' * filled}[/][{C['s1']}]{'━' * (width - filled)}[/][{C['sub']}]{right}[/]"
+            f"[{C['mauve']}]{escape(full)}[/][b {C['pink']}]{escape(cursor)}[/][{C['s1']}]{escape(empty)}[/]"
+            f"[{C['sub']}]{escape(right)}[/]"
         )
 
     def render_controls(self):
@@ -632,6 +721,18 @@ class YtmApp(App):
             p.set_volume((self.state["volume"] or 0) + 10)
         elif bid == "auto":
             self.toggle_auto()
+        elif bid == "theme":  # instant: cycle through every theme in the library
+            names = [t["name"] for t in self.library_themes()]
+            cur = self.theme_spec["name"]
+            nxt = names[(names.index(cur) + 1) % len(names)] if cur in names else names[0]
+            self.apply_theme(self.theme_named(nxt))
+            self.lib.log("theme_cycle", self.current_id() or "", to=nxt)
+            self.say(f"◐ {escape(nxt)}")
+        elif bid == "vibe":  # instant: calm strips decoration, loud adds it
+            self.vibe = theme.VIBES[(theme.VIBES.index(self.vibe) + 1) % len(theme.VIBES)]
+            event.button.label = f"vibe: {self.vibe}"
+            self.apply_theme()
+            self.lib.log("vibe", self.current_id() or "", to=self.vibe)
         elif bid == "like_now":
             t = self.current_track()
             self.like(t) if t else self.say("nothing playing")

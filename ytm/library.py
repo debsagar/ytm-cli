@@ -1,6 +1,7 @@
 """Local data: play history (history.tsv, written by mpv/scripts/history.lua),
 plus liked songs and playlists in a small SQLite database (data/ytm.db)."""
 
+import json
 import sqlite3
 import threading
 import time
@@ -19,6 +20,10 @@ CREATE TABLE IF NOT EXISTS playlist_items (
     playlist TEXT, id TEXT, pos INTEGER,
     PRIMARY KEY (playlist, id)
 );
+CREATE TABLE IF NOT EXISTS features (id TEXT PRIMARY KEY, data TEXT);  -- Jev judgment per song
+CREATE TABLE IF NOT EXISTS themes (name TEXT PRIMARY KEY, spec TEXT, created REAL);  -- LLM-written themes
+CREATE TABLE IF NOT EXISTS centres (name TEXT PRIMARY KEY, vec TEXT);  -- learned cluster centres
+CREATE TABLE IF NOT EXISTS events (at REAL, type TEXT, id TEXT, data TEXT);  -- play/skip/tweak signals
 """
 
 
@@ -101,6 +106,49 @@ class Library:
 
     def remove_from_playlist(self, name, video_id):
         self._q("DELETE FROM playlist_items WHERE playlist=? AND id=?", (name, video_id))
+
+    # ---- song features, themes, events (the memory the brain reads) ----
+    def features(self, video_id):
+        row = self._q("SELECT data FROM features WHERE id=?", (video_id,))
+        return json.loads(row[0][0]) if row else None
+
+    def save_features(self, video_id, data):
+        self._q("INSERT OR REPLACE INTO features VALUES (?,?)", (video_id, json.dumps(data)))
+
+    def centres(self):
+        return {n: json.loads(v) for n, v in self._q("SELECT name, vec FROM centres")}
+
+    def set_centre(self, name, vec):
+        self._q("INSERT OR REPLACE INTO centres VALUES (?,?)", (name, json.dumps(vec)))
+
+    def remember(self, video_id, title, artist):
+        self._q("INSERT OR IGNORE INTO tracks VALUES (?,?,?,?)", (video_id, title, artist, ""))
+
+    def all_features(self):
+        return {vid: json.loads(d) for vid, d in self._q("SELECT id, data FROM features")}
+
+    def song(self, video_id):
+        row = self._q("SELECT title, artist FROM tracks WHERE id=?", (video_id,))
+        return {"title": row[0][0], "artist": row[0][1]} if row else None
+
+    def themes(self):
+        return [json.loads(r[0]) for r in self._q("SELECT spec FROM themes ORDER BY created")]
+
+    def save_theme(self, spec):
+        self._q("INSERT OR REPLACE INTO themes VALUES (?,?,?)", (spec["name"], json.dumps(spec), time.time()))
+
+    def log(self, type_, video_id="", **data):
+        self._q("INSERT INTO events VALUES (?,?,?,?)", (time.time(), type_, video_id, json.dumps(data)))
+
+    def profile(self, limit=15):
+        """Small taste summary for prompts: top artists and playlist names."""
+        rows = self._q("SELECT artist FROM tracks WHERE artist != ''")
+        counts = {}
+        for (a,) in rows:
+            for name in a.split(", "):
+                counts[name] = counts.get(name, 0) + 1
+        top = sorted(counts, key=counts.get, reverse=True)[:limit]
+        return {"top_artists": top, "playlists": [n for n, _ in self.playlists()]}
 
     def delete_playlist(self, name):
         self._q("DELETE FROM playlist_items WHERE playlist=?", (name,))
