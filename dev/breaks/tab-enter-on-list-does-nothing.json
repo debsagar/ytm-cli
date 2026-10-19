@@ -1,0 +1,23 @@
+{
+ "why": "fill_list sets lv.index against the stale child list (the clear() is still pending), so nothing ends up highlighted and Tab then Enter on the list does nothing until you press an arrow.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  }
+ ],
+ "steps": [
+  "save solo",
+  "playlists",
+  {
+   "key": "tab"
+  },
+  {
+   "key": "enter"
+  }
+ ],
+ "expect": [
+  "≡ solo"
+ ]
+}

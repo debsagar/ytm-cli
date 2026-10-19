@@ -1,0 +1,14 @@
+{
+ "why": "At the real 74x24 window the controls row is wider than #info, so the last button shows as a lone 'v' instead of 'vibe'. (Fixed by icon labels; vibe shows its current mood.)",
+ "theme": "default",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "Song",
+   "artist": "A"
+  }
+ ],
+ "expect": [
+  "normal"
+ ]
+}

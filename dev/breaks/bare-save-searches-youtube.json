@@ -1,0 +1,10 @@
+{
+ "why": "`save` with no name (also `play`, `radio`) falls through to the plain-text search, so it searches YouTube for the word 'save' instead of showing the usage.",
+ "steps": [
+  "save"
+ ],
+ "absent": [
+  "searching save",
+  "no results for save"
+ ]
+}

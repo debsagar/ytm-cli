@@ -1,0 +1,9 @@
+{
+ "why": "The help box is 72 wide with padding 2 plus the border, so at 74 columns the descriptions wrap onto a second line with no indent ('like / unlike the song that's' / 'playing').",
+ "steps": [
+  "?"
+ ],
+ "expect": [
+  "like / unlike the song that's playing"
+ ]
+}

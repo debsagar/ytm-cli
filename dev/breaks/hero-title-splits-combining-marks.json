@@ -1,0 +1,14 @@
+{
+ "why": "theme.spaced() puts a space between every code point, so a decomposed accent (e + U+0301) lands on its own cell: 'C A F E ́' instead of 'C A F É'.",
+ "theme": "pit wall",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "café",
+   "artist": "A"
+  }
+ ],
+ "expect": [
+  "C A F É"
+ ]
+}

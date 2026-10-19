@@ -1,0 +1,26 @@
+{
+ "why": "When a title or name ends in a backslash, escape() leaves it escaping the closing tag, so rows show a literal '[/]' (the style leaks) and the now-playing title shows the backslash doubled.",
+ "theme": "default",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "C:\\",
+   "artist": "x\\"
+  },
+  {
+   "id": "bbbbbbbbbbb",
+   "title": "Next",
+   "artist": "Y"
+  }
+ ],
+ "steps": [
+  "queue"
+ ],
+ "expect": [
+  "▶  C:\\  x\\"
+ ],
+ "absent": [
+  "\\[/]",
+  "C:\\\\"
+ ]
+}

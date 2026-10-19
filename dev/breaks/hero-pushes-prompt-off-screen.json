@@ -1,0 +1,19 @@
+{
+ "why": "Hero art is 40x20 cells but art is shown whenever the window is 70x26 or bigger, so at 80x26 the now panel takes ~22 rows and the prompt and footer fall off the bottom.",
+ "size": [
+  80,
+  26
+ ],
+ "theme": "pit wall",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "Song",
+   "artist": "A"
+  }
+ ],
+ "expect": [
+  "search a song",
+  "? help"
+ ]
+}

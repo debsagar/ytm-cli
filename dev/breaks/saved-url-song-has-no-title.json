@@ -1,0 +1,25 @@
+{
+ "why": "queue_tracks() uses Track(v, \"\") for songs not in self.known (e.g. a pasted URL) and ignores media-title, so `save` stores the song with an empty title and the playlist shows a blank row.",
+ "steps": [
+  "play youtu.be/abcdefghijk",
+  {
+   "mpv": {
+    "media-title": "Pasted Song"
+   }
+  },
+  "save u",
+  "playlists",
+  {
+   "key": "tab"
+  },
+  {
+   "key": "down"
+  },
+  {
+   "key": "enter"
+  }
+ ],
+ "expect": [
+  "1 Pasted Song"
+ ]
+}

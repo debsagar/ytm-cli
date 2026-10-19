@@ -1,0 +1,14 @@
+{
+ "why": "A settings.toml saved with a UTF-8 BOM (Notepad, PowerShell 5.1 Set-Content) fails tomllib with no message at startup, so every hand-edited setting is silently ignored.",
+ "settings": "﻿mode = \"off\"\n",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "Song",
+   "artist": "A"
+  }
+ ],
+ "expect": [
+  "help   off"
+ ]
+}
