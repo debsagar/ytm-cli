@@ -148,11 +148,11 @@ class PlaylistRow(ListItem):
 class HelpScreen(ModalScreen):
     """A popup of text lines: the help, or the settings list."""
     BINDINGS = [Binding("escape,question_mark,q,enter", "dismiss")]
-    CSS = f"""
-    HelpScreen {{ align: center middle; background: $ytm-crust 70%; }}
-    #help {{ width: 72; max-width: 100%; height: auto; max-height: 100%; background: $ytm-mantle;
+    CSS = """
+    HelpScreen { align: center middle; background: $ytm-crust 70%; }
+    #help { width: 72; max-width: 100%; height: auto; max-height: 100%; background: $ytm-mantle;
              border: round $ytm-mauve; padding: 1 1; border-title-color: $ytm-mauve;
-             scrollbar-size-vertical: 1; scrollbar-color: $ytm-mauve; scrollbar-background: $ytm-mantle; }}
+             scrollbar-size-vertical: 1; scrollbar-color: $ytm-mauve; scrollbar-background: $ytm-mantle; }
     """
 
     def __init__(self, lines=None, title="how to use ytm"):
@@ -171,14 +171,14 @@ class HelpScreen(ModalScreen):
 class PlaylistPicker(ModalScreen):
     """Pick an existing playlist or type a new name. Dismisses with the name, or None."""
     BINDINGS = [Binding("escape", "dismiss(None)")]
-    CSS = f"""
-    PlaylistPicker {{ align: center middle; background: $ytm-crust 70%; }}
-    #box {{ width: 50; height: auto; max-height: 20; background: $ytm-mantle;
-            border: round $ytm-mauve; padding: 1 2; border-title-color: $ytm-mauve; }}
-    #pl {{ height: auto; max-height: 10; background: $ytm-mantle; }}
-    #pl > ListItem.-highlight {{ background: $ytm-s0; }}
-    #name {{ margin-top: 1; border: round $ytm-s1; background: $ytm-base; }}
-    #name:focus {{ border: round $ytm-mauve; }}
+    CSS = """
+    PlaylistPicker { align: center middle; background: $ytm-crust 70%; }
+    #box { width: 50; height: auto; max-height: 20; background: $ytm-mantle;
+            border: round $ytm-mauve; padding: 1 2; border-title-color: $ytm-mauve; }
+    #pl { height: auto; max-height: 10; background: $ytm-mantle; }
+    #pl > ListItem.-highlight { background: $ytm-s0; }
+    #name { margin-top: 1; border: round $ytm-s1; background: $ytm-base; }
+    #name:focus { border: round $ytm-mauve; }
     """
 
     def __init__(self, playlists, what):
