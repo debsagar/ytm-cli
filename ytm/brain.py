@@ -262,3 +262,32 @@ def recluster(lib):
     for vid, f in lib.all_features().items():
         if "mood_p" in f:
             lib.save_features(vid, assign(f, themes))
+
+
+def with_look(lib, vid, f):
+    """f with the look you settled on for this song (or a very close one) in place of its
+    nearest theme. It counts as a perfect fit, so restyle cadence, stickiness and can_change
+    still decide whether the look switches. Never saved: clustering keeps the nearest theme."""
+    name = context.look_for(lib, vid, f)
+    if not name or name == f.get("theme") or name not in {t["name"] for t in all_themes(lib)}:
+        return f
+    return {**f, "theme": name, "dist": 0.0, "chosen": True}
+
+
+def measure_next(lib, s):
+    """Measure one song known only from history, most played first. True when one was measured,
+    False when none are left, None when Jev isn't allowed right now or the call failed."""
+    if not budget(lib, s)[0]:
+        return None
+    st = context.state(lib)
+    todo = [v for v in st["_plays"] if v not in st["_feats"]]
+    if not todo:
+        return False
+    vid = max(todo, key=st["_plays"].get)
+    artist, sep, title = st["_names"].get(vid, vid).partition(" - ")
+    song = lib.song(vid) or ({"title": title, "artist": artist} if sep else {"title": artist, "artist": ""})
+    try:
+        think({"id": vid, **song}, lib, llm=False)
+    except Exception:  # shortcut: offline or API trouble is retried on the next tick, forever
+        return None
+    return True

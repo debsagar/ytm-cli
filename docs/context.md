@@ -55,6 +55,18 @@ Caps are enforced by `_fit`, which drops the last, least important item of the b
 
 The state is a pure function of append-only data, so it can always be rebuilt and never drifts. New plays, likes, skips and look changes appear the next time a slice is built. The half-life lets old favourites fade without deleting anything. Only the optional profile note costs an LLM call.
 
+Cycling logs every look or vibe passed through; only the one you **settle** on counts (no further pick within 30 s, or the song changed).
+
+What the app does with it, all code, no model (`dev/learn_check.py` checks each on a copy of real data):
+
+| when | what | where |
+|---|---|---|
+| per autoplay top-up | radio candidates re-ranked: down for artists you skip early, up when close to your current session (else this daypart), down when close to songs you skip. Unmeasured songs keep their radio order; nothing is dropped | `context.rerank` |
+| per `radio` | the same, pulled towards the seed song's vector ("more like this"); the seed stays first | `context.rerank(seed=)` |
+| per song | the look you settled on for this song, or for a song within 0.25 of it, replaces its nearest theme as a perfect fit; restyle cadence, stickiness and can_change still apply. Per song, never saved, no global drift | `brain.with_look` |
+| at launch | if the last session ended mid-song (the `quit` event, else a final `skip`), that song is loaded paused at its position: "resume · title at 1:23 · press ⏯". The vibe you settle on at this daypart (≥60% of ≥5 picks) is the starting vibe | `context.resume`, `context.usual_vibe` |
+| every 30 s while playing, idle | one song known only from history.tsv is measured by Jev, most played first, within the budget; stops when none are left | `brain.measure_next` |
+
 ## Settings
 
 No new setting. Building the state is free code. Paid consumers stay under the existing rules: `mode` (off: no slices sent; jev: theme writer; yolo: + widgets), `budget_day` and `budget_month` (the LLM stops at 80%), `grow_themes` and `max_new_themes_week` for the theme writer. The daily rewrite would be once a day at most, behind the same LLM allowance.

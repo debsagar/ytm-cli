@@ -10,11 +10,12 @@ slice_for(consumer, lib, ...) cuts a purpose-specific piece of it under a size c
 See docs/context.md."""
 
 import json
+import math
 import sys
 import time
 from collections import deque
 
-from . import library
+from . import brain, library
 
 HALF_LIFE = 45 * 86400   # a play counts half as much after 45 days
 SESSION_GAP = 30 * 60    # a pause this long starts a new session
@@ -23,6 +24,10 @@ MIN_N = 3                # behaviour needs this many observations before it's re
 CAPS = {"jev": 200, "theme": 900, "widget": 1000, "profile": 3200}  # JSON chars, ~4 per token
 DAYPARTS = [("night", 0), ("morning", 6), ("afternoon", 12), ("evening", 18)]
 ENERGY = ["calm", "mid", "upbeat", "intense"]  # quarters of Jev's 0..1 energy
+SETTLE = 30              # a look or vibe kept this long (or until the song changes) is a choice
+NEAR = 0.25              # songs this close in Jev space share a chosen look (median distance to a theme is 0.51)
+TYPICAL = 0.5            # distance that neither pulls a song up nor pushes it down
+SHIFT = 10               # how many places a strong reason may move a radio song
 
 _memo = (None, None)
 
@@ -68,6 +73,13 @@ def _plays():
             except ValueError:
                 continue
             yield days[stamp[:10]] + 3600 * hour + 60 * minute, hour, parts[1].split("v=", 1)[1][:11], parts[2]
+
+
+def _settled(rows, per_song=False):
+    """The (at, id, to) picks you stayed on: no further pick within SETTLE seconds
+    (per_song: or the next pick is on another song, i.e. the song changed)."""
+    return [r for r, nxt in zip(rows, rows[1:] + [None])
+            if not nxt or nxt[0] - r[0] >= SETTLE or (per_song and nxt[1] != r[1])]
 
 
 def _signature(lib):
@@ -158,10 +170,14 @@ def _build(lib):
         o[2 if typ == "finish" else 0 if (at or 0) < EARLY * (dur or 1) else 1] += 1
     for vid, (early, _, _) in outcome.items():
         weight[vid] = max(0.0, weight.get(vid, 0) - early)
-    chosen_look, vibe = {}, {}
-    for typ, vid, to in lib._q("SELECT type, id, json_extract(data,'$.to') FROM events "
-                               "WHERE type IN ('theme_cycle','vibe') ORDER BY at"):
-        (chosen_look if typ == "theme_cycle" else vibe)[vid] = to  # last choice per song wins
+    picks = {"theme_cycle": [], "vibe": []}
+    for typ, at, vid, to in lib._q("SELECT type, at, id, json_extract(data,'$.to') FROM events "
+                                   "WHERE type IN ('theme_cycle','vibe') ORDER BY at"):
+        picks[typ].append((at, vid, to))
+    # cycling logs every look passed through; only the one you stay on is a choice
+    chosen_look = {vid: to for _, vid, to in _settled(picks["theme_cycle"], per_song=True) if vid}
+    vibes = [(_daypart(time.localtime(at).tm_hour), to) for at, _, to in _settled(picks["vibe"])]
+    vibe = dict(enumerate(to for _, to in vibes))
 
     def rates(key):
         """{group: early-skip rate} for groups with enough skip/finish observations."""
@@ -226,6 +242,7 @@ def _build(lib):
         if recent else {},
         "_names": {v: name(v) for v in set(plays) | in_list},  # for slices; never sent as is
         "_plays": plays, "_lists": lists, "_parts": parts, "_outcome": outcome,
+        "_feats": feats, "_recent": list(recent), "_looks": chosen_look, "_vibes": vibes,
     }
 
 
@@ -307,6 +324,94 @@ def slice_for(consumer, lib, ids=(), video_id=None):
     if consumer == "profile":
         return _fit(_public(s, "library", "taste", "contexts", "behaviour", "recent"), CAPS["profile"])
     raise ValueError(f"unknown consumer {consumer}; one of state, {', '.join(CAPS)}")
+
+
+# ---- learning: code that acts on the state, no model involved ----
+def _vec(s, vid):
+    f = s["_feats"].get(vid)
+    return brain.song_vec(f) if f else None
+
+
+def _mean(vs):
+    vs = [v for v in vs if v]
+    return [sum(c) / len(vs) for c in zip(*vs)] if vs else None
+
+
+def scores(lib, tracks, seed=None):
+    """{video id: (places to move down, reasons)} for radio candidates. Songs are pulled towards
+    the seed (the song a radio started from), else your current session, else this daypart,
+    and pushed away from songs you skip early and from artists you skip early."""
+    s = state(lib)
+    skip_rate = {a.casefold(): r for a, r in s["behaviour"]["skip_by_artist"].items()}
+    good, near = (_vec(s, seed), "the seed") if seed else (None, "")
+    recent = s["_recent"]
+    if not good and recent and time.time() - recent[-1][0] < SESSION_GAP:
+        good, near = _mean(_vec(s, v) for _, v in recent), "your session"
+    if not good:
+        part = _daypart(time.localtime().tm_hour)
+        good, near = _mean(_vec(s, v) for v, n in s["_parts"][part].items() for _ in range(n)), f"your {part}s"
+    bad = _mean(_vec(s, v) for v, o in s["_outcome"].items() if o[0])
+    clip = lambda x: SHIFT * max(-1.0, min(1.0, x))
+    out = {}
+    for t in tracks:
+        shift, why = 0.0, []
+        rate, artist = max(((skip_rate.get(a.casefold(), 0), a) for a in (t.artist or "").split(", ")))
+        if rate:
+            shift += SHIFT * rate
+            why.append(f"you skip {artist} early {rate:.0%}")
+        v = _vec(s, t.video_id)
+        if v and good:
+            d = math.dist(v, good)
+            shift += clip(d - TYPICAL)
+            why.append(f"{'near' if d < TYPICAL else 'far from'} {near} ({d:.2f})")
+        if v and bad:
+            d = math.dist(v, bad)
+            shift += clip(TYPICAL - d)
+            why.append(f"{'near' if d < TYPICAL else 'far from'} songs you skip ({d:.2f})")
+        out[t.video_id] = (round(shift, 1), why)
+    return out
+
+
+def rerank(lib, tracks, seed=None):
+    """Radio candidates reordered for you. Nothing is dropped, songs nothing is known about keep
+    their radio order, and the seed, when it comes first, stays first."""
+    head = tracks[:1] if seed and tracks and tracks[0].video_id == seed else []
+    rest = tracks[len(head):]
+    sc = scores(lib, rest, seed)
+    return head + [t for _, t in sorted(enumerate(rest), key=lambda it: it[0] + sc[it[1].video_id][0])]
+
+
+def look_for(lib, vid, feats):
+    """The look you settled on for this song, or for the closest song within NEAR, else None."""
+    s = state(lib)
+    if vid in s["_looks"]:
+        return s["_looks"][vid]
+    if "mood_p" not in feats:
+        return None
+    v = brain.song_vec(feats)
+    near = [(math.dist(v, _vec(s, o)), to) for o, to in s["_looks"].items() if o in s["_feats"]]
+    d, to = min(near, default=(NEAR + 1, None))
+    return to if d <= NEAR else None
+
+
+def resume(lib):
+    """{id, at} when the last session ended mid-song: from the quit event, or from a skip
+    if that was the last thing that happened. None otherwise."""
+    row = lib._q("SELECT type, id, json_extract(data,'$.at'), json_extract(data,'$.dur') FROM events "
+                 "WHERE type IN ('play','skip','finish','quit') ORDER BY at DESC LIMIT 1")
+    typ, vid, at, dur = row[0] if row else (None,) * 4
+    if typ in ("quit", "skip") and vid and at and dur and at < dur - 15:
+        return {"id": vid, "at": int(at)}
+    return None
+
+
+def usual_vibe(lib, hour=None):
+    """The vibe you settle on at this time of day, if it's a clear habit (≥60% of ≥5 picks)."""
+    part = _daypart(time.localtime().tm_hour if hour is None else hour)
+    c = _count(to for p, to in state(lib)["_vibes"] if p == part)
+    n = sum(c.values())
+    top = max(c, key=c.get, default=None)
+    return top if n >= 5 and c[top] >= 0.6 * n else None
 
 
 def main(args):
