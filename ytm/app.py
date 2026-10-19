@@ -398,6 +398,7 @@ class YtmApp(App):
         self.layout = "classic"     # the layout on screen (the theme's, if the window fits it)
         self._log = []              # recent messages, shown in the dashboard's ask panel
         self._said = -math.inf      # when the user last got a reply (automatic notes wait 5 s after it)
+        self._held = None           # the newest automatic note waiting for that
         self._phase = 0.0           # animation clock, advances only while playing
         self._bar_width = None      # #info width the bar was last drawn for
 
@@ -911,11 +912,17 @@ class YtmApp(App):
         self.view = view
         self.fill_list()
 
+    def _show_held(self):
+        text, self._held = self._held, None
+        self.say(text, True)
+
     def say(self, text, auto=False):
         """Show a message. auto: a note nobody asked for, held back until the last reply is 5 s old."""
         wait = self._said + 5 - time.monotonic()
         if auto and wait > 0:
-            self.set_timer(wait, lambda: self.say(text, True))
+            if self._held is None:  # one timer; a newer note replaces an older one, so they never swap
+                self.set_timer(wait, self._show_held)
+            self._held = text
             return
         if not auto:
             self._said = time.monotonic()
