@@ -80,6 +80,7 @@ Each song gets a theme: colours, a scrolling motif, a progress-bar style and one
 | ![classic layout](docs/layout-classic.png) | ![focus layout](docs/layout-focus.png) |
 
 - **◐ theme** cycles through every theme.
+- **▦** cycles the layouts; type `layout` to see them all and pick one, previewed as you move (Esc puts yours back).
 - **vibe** switches between calm (focus layout, no decoration), normal and loud (stage layout).
 
 Without the optional brain (below), songs keep the default look; both buttons still work.

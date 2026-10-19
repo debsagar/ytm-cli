@@ -5,6 +5,7 @@ All notable changes to this project are documented here. Versions follow [Semant
 ## [Unreleased]
 
 ### Added
+- `layout` opens a layout picker: each layout with its description, the current one marked, ones too big for the window dimmed; moving the highlight previews it, Enter keeps it, Esc puts yours back. ▦ still cycles.
 - One-command install: `irm https://raw.githubusercontent.com/debsagar/ytm-cli/main/install.ps1 | iex` installs missing dependencies with winget, clones ytm into `%LOCALAPPDATA%\ytm`, sets up its packages and adds the `ytm` command. Running it again updates.
 
 ## [0.5.1] - 2026-10-19

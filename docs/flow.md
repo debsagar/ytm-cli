@@ -144,7 +144,8 @@ Typed input: `YtmApp.run_command` (`@on(Input.Submitted, "#prompt")`) splits the
 | `skip/next/n`, `prev/back`, `pause/p`, `vol N`, `remove N`/`rm N`, `clear` | `Player` methods directly |
 | `set …`, `mode …` | `change_setting` → `Settings.set` (or the settings popup, a `HelpScreen`) |
 | `cost` | `cost_report` |
-| `layout [name]`, `vibe [name]` | `pick_layout`, `set_vibe` |
+| `layout` | `choose_layout` → a `LayoutPicker` popup that previews each layout; Enter → `pick_layout(name)` |
+| `layout <name>`, `vibe [name]` | `pick_layout`, `set_vibe` |
 | `help`, `?` | `action_help` |
 | a bare URL | `Player.play` |
 | anything else | `do_search(line, "search")` |

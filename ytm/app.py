@@ -51,7 +51,7 @@ HELP_ROWS = [
     ("cost", "what the brain has spent (Jev + LLM)"),
     ("set · set <key> <value>", "see or change settings"),
     ("mode off · jev · yolo", "how much the brain may do"),
-    ("layout · layout <name>", "next one, or e.g. layout dashboard"),
+    ("layout · layout <name>", "pick one with a preview · ▦ cycles"),
     ("vibe · vibe calm|normal|loud", "calm: less decoration, loud: more"),
     ("quit", "exit (Ctrl+Q also works)"),
     ("", ""),
@@ -264,6 +264,55 @@ class PlaylistPicker(ModalScreen):
         self.dismiss(event.value.strip() or None)
 
 
+class LayoutPicker(ModalScreen):
+    """Pick a layout; the highlighted one is previewed behind the popup. Dismisses with a name, or None."""
+    BINDINGS = [Binding("escape", "dismiss(None)")]
+    CSS = """
+    LayoutPicker { align: center bottom; background: $ytm-crust 15%; }  /* light: the screen behind is the preview */
+    #lbox { width: 72; max-width: 100%; height: auto; max-height: 100%; background: $ytm-mantle;
+            border: round $ytm-mauve; padding: 0 1; border-title-color: $ytm-mauve; }
+    #lay { height: auto; background: $ytm-mantle; }
+    #lay > ListItem { background: $ytm-mantle; }
+    #lay > ListItem.-highlight { background: $ytm-s0; }
+    #lay Label { text-wrap: nowrap; text-overflow: ellipsis; }
+    #lhint { color: $ytm-dim; }
+    """
+
+    def __init__(self, rows, current, preview):
+        """rows: (name, description, fits the window); preview(name) shows a layout behind."""
+        super().__init__()
+        self.rows, self.current, self.preview = rows, current, preview
+
+    def compose(self):
+        items = []
+        for name, desc, fits in self.rows:
+            hi, lo = (C["blue"], C["sub"]) if fits else (C["dim"], C["dim"])
+            mark = "●" if name == self.current else " "
+            need = "" if fits else "needs a bigger window · "
+            items.append(ListItem(Label(f"{mark} [b {hi}]{name:<10}[/][{lo}]{need}{escape(desc)}[/]")))
+        index = next((i for i, r in enumerate(self.rows) if r[0] == self.current), 0)
+        with Vertical(id="lbox") as box:
+            box.border_title = "layouts"
+            yield ListView(*items, id="lay", initial_index=index)
+            yield Static("↑↓ preview · Enter keeps it · Esc puts yours back", id="lhint")
+
+    def on_mount(self):
+        self.query_one("#lay").focus()
+
+    @on(ListView.Highlighted)
+    def moved(self, event):
+        if event.list_view.index is not None:
+            self.preview(self.rows[event.list_view.index][0])
+
+    @on(ListView.Selected)
+    def chose(self, event):
+        name, _, fits = self.rows[event.list_view.index]
+        if fits:
+            self.dismiss(name)
+        else:
+            self.query_one("#lhint").update(f"{name} needs a bigger window ({DASH_MIN[0]}x{DASH_MIN[1]}) · Esc puts yours back")
+
+
 class YtmApp(App):
     TITLE = "ytm"
     ENABLE_COMMAND_PALETTE = False
@@ -440,7 +489,7 @@ class YtmApp(App):
                                 with Horizontal():
                                     yield Btn("∞", id="auto", tooltip="autoplay")
                                     yield Btn("◐", id="theme", tooltip="next theme")
-                                    yield Btn("▦", id="layout", tooltip="layout: classic")
+                                    yield Btn("▦", id="layout", tooltip="next layout · type layout to pick")
                 with Vertical(id="library", classes="panel") as p:
                     p.border_title = "library"
                     with Horizontal(id="tabs"):
@@ -598,7 +647,7 @@ class YtmApp(App):
         for name in theme.LAYOUTS:
             self.main.set_class(name == lay, f"layout-{name}")
         self.main.set_class(self.size.height < 28, "tight")  # panels lose their gaps
-        tip = f"layout: {lay}" + (f" ({want} needs {DASH_MIN[0]}x{DASH_MIN[1]})" if lay != want else "")
+        tip = f"next layout · type layout to pick · now {lay}" + (f" ({want} needs {DASH_MIN[0]}x{DASH_MIN[1]})" if lay != want else "")
         if self.query_one("#layout").tooltip != tip:
             self.query_one("#layout").tooltip = tip
         self.fit_art()
@@ -619,6 +668,24 @@ class YtmApp(App):
         self.lib.log("layout", self.current_id() or "", to=name)
         small = "" if self.layout == name else f" · needs {DASH_MIN[0]}x{DASH_MIN[1]}, showing {self.layout} for now"
         self.say(f"▦ {name}{small}")
+
+    def choose_layout(self):
+        """`layout` alone: a picker that previews each layout; Enter picks it like `layout <name>`."""
+        before = (self.theme_spec, self.vibe)
+
+        def preview(name):
+            fits = self.fits(name)
+            self.theme_spec, self.vibe = ({**before[0], "layout": name}, "normal") if fits else before
+            self.apply_theme()
+
+        def done(name):
+            self.theme_spec, self.vibe = before
+            if name:
+                self.pick_layout(name)  # logs it, and it sticks
+            else:
+                self.apply_theme()
+        rows = [(n, d, self.fits(n)) for n, d in theme.LAYOUTS.items()]
+        self.push_screen(LayoutPicker(rows, self.layout, preview), done)
 
     def set_vibe(self, vibe=None):
         """Instant control: calm strips decoration, loud adds it."""
@@ -1131,7 +1198,7 @@ class YtmApp(App):
             elif cmd == "cost":
                 self.cost_report()
             elif cmd == "layout":
-                self.pick_layout(arg.lower() or None)
+                self.pick_layout(arg.lower()) if arg else self.choose_layout()
             elif cmd == "vibe":
                 self.set_vibe(arg.lower() or None)
             elif cmd in ("help", "?"):
@@ -1245,7 +1312,7 @@ class YtmApp(App):
         self.show(names[(names.index(cur) + step) % len(names)])
 
     def action_help(self):
-        if not isinstance(self.screen, (HelpScreen, PlaylistPicker)):
+        if not isinstance(self.screen, (HelpScreen, PlaylistPicker, LayoutPicker)):
             self.push_screen(HelpScreen())
 
     # ---- hotkeys ----
