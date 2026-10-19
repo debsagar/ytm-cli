@@ -13,7 +13,7 @@
    "set budget_day=0.10"
   ],
   "expect": [
-   "⚙ budget_day = 0.1"
+   "set budget_day = 0.1"
   ]
  },
  {
@@ -30,7 +30,7 @@
    "set mode = off"
   ],
   "expect": [
-   "⚙ mode = \"off\""
+   "set mode = \"off\""
   ]
  },
  {
@@ -47,7 +47,7 @@
    "set restyle \"pinned\""
   ],
   "expect": [
-   "⚙ restyle = \"pinned\""
+   "set restyle = \"pinned\""
   ]
  },
  {
@@ -64,7 +64,7 @@
    "set can_change = [\"colours\", \"motif\"]"
   ],
   "expect": [
-   "⚙ can_change = [\"colours\", \"motif\"]"
+   "set can_change = [\"colours\", \"motif\"]"
   ]
  },
  {
@@ -81,7 +81,7 @@
    "set Mode OFF"
   ],
   "expect": [
-   "⚙ mode = \"off\""
+   "set mode = \"off\""
   ]
  }
 ]

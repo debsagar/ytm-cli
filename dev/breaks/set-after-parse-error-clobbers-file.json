@@ -19,7 +19,7 @@
   "fix settings.toml first"
  ],
  "absent": [
-  "⚙ mode",
+  "set mode = ",
   "settings reloaded"
  ]
 }

@@ -731,7 +731,7 @@ class YtmApp(App):
         if self._ticks % 8 == 0 and not self.player.restarted:  # mpv died with nobody pressing anything
             self.player.check()
         if self._ticks % 8 == 0 and self.settings.reload():  # every 2 s: pick up hand edits
-            self.say(escape(self.settings.error or self.settings.bad or "⚙ settings reloaded"), True)
+            self.say(escape(self.settings.error or self.settings.bad or "settings reloaded"), True)
             self.render_footer()
         self.apply_layout()  # also on resize, but the new size can arrive a moment later
         if self.query_one("#info").content_size.width != self._bar_width:
@@ -886,7 +886,7 @@ class YtmApp(App):
             self.say(escape(str(e)))
             return
         self.lib.log("setting", "", key=key, to=v)
-        self.say(f"⚙ {escape(key)} = {escape(settings._toml(v))}")
+        self.say(f"set {escape(key)} = {escape(settings._toml(v))}")  # no ⚙: Windows Terminal draws it 2 cells wide
         self.render_footer()
 
     def cost_report(self):
