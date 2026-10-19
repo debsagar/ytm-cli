@@ -154,16 +154,6 @@ class Library:
                        "FROM events WHERE type='cost' AND at>=? GROUP BY 1", (since,))
         return {api: (n, usd or 0.0) for api, n, usd in rows}
 
-    def profile(self, limit=15):
-        """Small taste summary for prompts: top artists and playlist names."""
-        rows = self._q("SELECT artist FROM tracks WHERE artist != ''")
-        counts = {}
-        for (a,) in rows:
-            for name in a.split(", "):
-                counts[name] = counts.get(name, 0) + 1
-        top = sorted(counts, key=counts.get, reverse=True)[:limit]
-        return {"top_artists": top, "playlists": [n for n, _ in self.playlists()]}
-
     def delete_playlist(self, name):
         self._q("DELETE FROM playlist_items WHERE playlist=?", (name,))
         self._q("DELETE FROM playlists WHERE name=?", (name,))
