@@ -1,0 +1,20 @@
+{
+ "why": "A link typed in capitals (HTTPS://YOUTU.BE/...) matches URL_RE (re.I), but startswith(\"http\") is case-sensitive, so it became https://HTTPS://YOUTU.BE/... and mpv got a broken URL.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  }
+ ],
+ "steps": [
+  "queue HTTPS://YOUTU.BE/bbbbbbbbbbb",
+  "queue"
+ ],
+ "expect": [
+  "YOUTU.BE/bbbbbbbbbbb"
+ ],
+ "absent": [
+  "https://HTTPS"
+ ]
+}

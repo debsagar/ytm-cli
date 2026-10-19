@@ -30,7 +30,7 @@ C = dict(
 )
 
 URL_RE = re.compile(r"^(https?://)?((www|music|m)\.)?youtu(be\.com|\.be)/", re.I)
-VID_RE = re.compile(r"(?:v=|youtu\.be/)([\w-]{11})")
+VID_RE = re.compile(r"(?:v=|youtu\.be/)([\w-]{11})", re.I)  # links may be typed in capitals
 # Noise YouTube adds to titles: "(Official Music Video)", "[Lyrics]", "| Lyrics" ...
 NOISE_RE = re.compile(
     r"\s*([(\[][^)\]]*\b(official|video|lyrics?|letra|audio|visuali[sz]er|oficial|4k|hd)\b[^)\]]*[)\]]|\|\s*lyrics.*)",
@@ -1002,7 +1002,7 @@ class YtmApp(App):
             if cmd in ("play", "queue", "q+", "radio", "search", "s") and arg:
                 action = {"q+": "queue", "s": "search"}.get(cmd, cmd)
                 if URL_RE.match(arg) and action in ("play", "queue"):
-                    url = arg if arg.startswith("http") else "https://" + arg
+                    url = arg if arg.lower().startswith("http") else "https://" + arg
                     (p.play if action == "play" else p.queue)(url)
                 else:
                     self.do_search(arg, action)
@@ -1052,7 +1052,7 @@ class YtmApp(App):
             elif cmd in ("help", "?"):
                 self.action_help()
             elif URL_RE.match(line):
-                p.play(line if line.startswith("http") else "https://" + line)
+                p.play(line if line.lower().startswith("http") else "https://" + line)
             else:
                 self.do_search(line, "search")  # plain text = search
         except (ValueError, IndexError):
