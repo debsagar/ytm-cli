@@ -1,7 +1,7 @@
 -- Append every track that starts playing to history.tsv next to mpv.conf.
 -- One line per play: local time <TAB> url <TAB> artist - title. Read back by "ytm history".
 
-local path = mp.command_native({"expand-path", "~~/history.tsv"})
+local path = mp.get_opt("ytm-history") or mp.command_native({"expand-path", "~~/history.tsv"})
 local last = nil
 
 local function clean(s)

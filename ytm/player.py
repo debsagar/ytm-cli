@@ -19,6 +19,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MPV_CONFIG = ROOT / "mpv"
 
+
+def _home():
+    """Where your data lives (data/ytm.db, mpv/history.tsv): $YTM_HOME, else the folder named
+    in a ytm.home file next to the code (how ytm and ytmdev get different data), else the repo."""
+    if os.environ.get("YTM_HOME"):
+        return Path(os.environ["YTM_HOME"])
+    f = ROOT / "ytm.home"
+    return Path(f.read_text(encoding="utf-8").strip()) if f.exists() else ROOT
+
+
+HOME = _home()
+
 # Properties the UI cares about; mpv pushes a message whenever one changes.
 WATCHED = ["media-title", "time-pos", "duration", "pause", "volume", "playlist-pos", "playlist-count"]
 
@@ -103,7 +115,9 @@ class Player:
             *extra_args,
         ]
         if ytdl:
-            args.append(f"--script-opts=ytdl_hook-ytdl_path={ytdl}")
+            args.append(f"--script-opts-append=ytdl_hook-ytdl_path={ytdl}")
+        if HOME != ROOT:  # otherwise history.lua writes next to mpv.conf, as before
+            args.append(f"--script-opts-append=ytm-history={HOME / 'mpv' / 'history.tsv'}")
         self.proc = subprocess.Popen(args, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         self._job = _kill_with_parent(self.proc)
         self._ids = itertools.count(1)

@@ -6,11 +6,11 @@ import sqlite3
 import threading
 import time
 
-from .player import MPV_CONFIG, ROOT
+from .player import HOME
 from .search import Track
 
-HISTORY = MPV_CONFIG / "history.tsv"
-DB = ROOT / "data" / "ytm.db"
+HISTORY = HOME / "mpv" / "history.tsv"
+DB = HOME / "data" / "ytm.db"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tracks (id TEXT PRIMARY KEY, title TEXT, artist TEXT, duration TEXT);
