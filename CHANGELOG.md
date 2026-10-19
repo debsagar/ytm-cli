@@ -4,6 +4,9 @@ All notable changes to this project are documented here. Versions follow [Semant
 
 ## [Unreleased]
 
+### Changed
+- Packages are managed with [uv](https://docs.astral.sh/uv/) and pinned in `uv.lock`. Each copy of the code gets its own `.venv`, created on the first `ytm` run and synced by `ytm update`, so updating the installed copy no longer changes a dev checkout. Install uv first; the old `%USERPROFILE%\.venvs\ytm` can be deleted.
+
 ## [0.5.0] - 2026-10-19
 
 ### Added
