@@ -57,6 +57,7 @@ LAYOUTS = {
     "hero": "big album art and a spaced-out title, short list",
     "stage": "animated equaliser instead of art, list below",
     "focus": "just the song, centred; no list",
+    "dashboard": "four panels: player, ask, library, visualizer (needs 100x30)",
 }
 
 DEFAULT = {

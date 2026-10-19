@@ -12,7 +12,7 @@ os.environ.setdefault("COLORTERM", "truecolor")
 from textual import on, work  # noqa: E402
 from textual.app import App, ComposeResult  # noqa: E402
 from textual.binding import Binding  # noqa: E402
-from textual.containers import Horizontal, Vertical, VerticalScroll  # noqa: E402
+from textual.containers import Container, Horizontal, Vertical, VerticalScroll  # noqa: E402
 from textual.markup import escape as _escape  # noqa: E402
 from textual.screen import ModalScreen  # noqa: E402
 from textual.widgets import Button, Input, Label, ListItem, ListView, Static  # noqa: E402
@@ -37,6 +37,7 @@ NOISE_RE = re.compile(
 )
 TABS = ["queue", "history", "liked", "playlists", "results"]
 ART_W, ART_H = 20, 10  # cells; the image is 20x20 pixels
+DASH_MIN = (100, 30)  # the dashboard layout needs this many cells; smaller windows show classic
 
 HELP_ROWS = [
     ("Type anything", "search YouTube Music"),
@@ -51,6 +52,8 @@ HELP_ROWS = [
     ("cost", "what the brain has spent (Jev + LLM)"),
     ("set · set <key> <value>", "see or change settings"),
     ("mode off · jev · yolo", "how much the brain may do"),
+    ("layout · layout <name>", "next one, or e.g. layout dashboard"),
+    ("vibe · vibe calm|normal|loud", "calm: less decoration, loud: more"),
     ("quit", "exit (Ctrl+Q also works)"),
     ("", ""),
     ("Mouse", "every button and tab is clickable"),
@@ -212,7 +215,25 @@ class YtmApp(App):
     CSS = f"""
     Screen {{ background: $ytm-base; color: $ytm-text; }}
 
-    #now {{ height: auto; background: $ytm-mantle; padding: 1 2; }}
+    /* Panels: thin rounded boxes, subtle until focused; each has its own accent. */
+    /* Gaps go on fixed-height boxes only (a margin on a 1fr box overflows its parent),
+       and always as whole margins: a lone margin-bottom resets the other sides. */
+    #body {{ height: 1fr; padding: 1 0 0 0; }}
+    #left {{ height: 1fr; }}
+    #right {{ height: auto; margin: 1 0 0 0; }}
+    .panel {{ height: auto; margin: 0 1; padding: 0 1; background: $ytm-base;
+              border: round $ytm-s1; border-title-style: bold; border-title-align: left; }}
+    #player {{ margin: 0 1 1 1; border: round $ytm-mauve 45%; border-title-color: $ytm-mauve; }}
+    Screen.tight #body, Screen.tight #right {{ padding: 0; margin: 0; }}
+    Screen.tight #player {{ margin: 0 1; }}
+    #library {{ height: 1fr; border-title-color: $ytm-green; }}
+    #library:focus-within {{ border: round $ytm-green; }}
+    #ask {{ border-title-color: $ytm-blue; }}
+    #ask:focus-within {{ border: round $ytm-blue; }}
+    #viz {{ display: none; height: 1fr; border-title-color: $ytm-mauve; }}
+    #log {{ display: none; color: $ytm-dim; content-align: left bottom; text-wrap: nowrap; text-overflow: ellipsis; }}
+
+    #now {{ height: auto; }}
     #art {{ width: {ART_W}; height: {ART_H}; margin-right: 2; color: $ytm-s1; }}
     #info {{ height: auto; }}
     #title {{ color: $ytm-pink; text-style: bold; }}
@@ -221,17 +242,36 @@ class YtmApp(App):
     Screen.layout-stage #eq {{ display: block; }}
     Screen.layout-hero.tall #art {{ width: {ART_W * 2}; height: {ART_H * 2}; margin-right: 3; }}
     Screen.layout-hero #title {{ margin-top: 1; }}
-    Screen.layout-hero #list {{ max-height: 12; }}
-    Screen.layout-focus #art, Screen.layout-focus #tabs, Screen.layout-focus #actions,
-    Screen.layout-focus #list {{ display: none; }}
+    Screen.layout-focus #art, Screen.layout-focus #library {{ display: none; }}
+    Screen.layout-focus #player {{ height: 1fr; margin: 0 1; }}
     Screen.layout-focus #now {{ height: 1fr; align: center middle; }}
     Screen.layout-focus #info {{ width: 80%; }}
+
+    /* dashboard: player | ask on top, library | visualizer below */
+    Screen.layout-dashboard #body {{ layout: horizontal; }}
+    Screen.layout-dashboard #left {{ width: 3fr; }}
+    Screen.layout-dashboard #right {{ width: 2fr; height: 1fr; margin: 0; }}
+    Screen.layout-dashboard #player, Screen.layout-dashboard #ask {{ height: {ART_H + 2}; }}
+    Screen.layout-dashboard #player {{ margin: 0 0 1 1; }}
+    Screen.layout-dashboard #library {{ margin: 0 0 0 1; }}
+    Screen.layout-dashboard #ask {{ margin: 0 1 1 1; }}
+    Screen.layout-dashboard #now, Screen.layout-dashboard #info {{ height: 1fr; }}
+    Screen.layout-dashboard #controls {{ dock: bottom; }}
+    Screen.layout-dashboard #ask {{ border-title-color: $ytm-pink; }}
+    Screen.layout-dashboard #ask:focus-within {{ border: round $ytm-pink; }}
+    Screen.layout-dashboard #viz {{ display: block; }}
+    Screen.layout-dashboard #log {{ display: block; height: 1fr; }}
+    Screen.layout-dashboard #motif {{ display: none; }}
+    Screen.layout-dashboard #controls {{ layout: vertical; height: 2; }}
+    #viz_eq {{ height: 1fr; color: $ytm-mauve; }}
+    #viz_cap {{ height: 1; color: $ytm-dim; text-wrap: nowrap; text-overflow: ellipsis; }}
     Screen.layout-focus #title {{ text-align: center; }}
     Screen.layout-focus #artist, Screen.layout-focus #headline, Screen.layout-focus #motif {{ text-align: center; }}
     #headline {{ color: $ytm-mauve; text-style: italic; height: auto; text-wrap: nowrap; text-overflow: ellipsis; }}
     Screen.layout-focus #headline {{ text-wrap: wrap; }}  /* focus has rows to spare */
     #artist {{ color: $ytm-sub; }}
     #bar {{ margin-top: 1; }}
+    Screen.tight #bar, Screen.tight #controls, Screen.layout-dashboard #bar {{ margin-top: 0; }}
     #title, #artist, #list Label {{ text-wrap: nowrap; text-overflow: ellipsis; }}
 
     Btn {{ height: 1; min-width: 3; width: auto; border: none; padding: 0 1; margin-right: 1;
@@ -239,6 +279,7 @@ class YtmApp(App):
     Btn:hover {{ background: $ytm-s1; }}
     Btn.-active {{ background: $ytm-s0; }}
     #controls {{ height: 1; margin-top: 1; }}
+    #controls > Horizontal {{ width: auto; height: 1; }}
     #controls Btn {{ padding: 0; }}  /* Button's line-pad already pads the icon */
     #controls .big {{ background: $ytm-mauve; color: $ytm-crust; text-style: bold; }}
     #controls .big:hover {{ background: $ytm-pink; }}
@@ -246,29 +287,29 @@ class YtmApp(App):
     #auto {{ color: $ytm-dim; }}
     #auto.on {{ color: $ytm-green; }}
 
-    #tabs {{ height: 1; padding: 0 1; margin-top: 1; }}
+    #tabs {{ height: 1; }}
     #tabs Btn {{ background: $ytm-base; color: $ytm-dim; margin-right: 0; }}
     #tabs Btn:hover {{ color: $ytm-text; }}
     #tabs Btn.current {{ background: $ytm-mauve; color: $ytm-crust; text-style: bold; }}
 
-    #actions {{ height: 1; padding: 0 1; margin-top: 1; }}
+    #actions {{ height: 1; }}
     #actions Btn {{ background: $ytm-base; color: $ytm-blue; border: none; }}
     #actions Btn:hover {{ background: $ytm-s0; }}
     #actions #r_rm {{ color: $ytm-red; }}
 
-    #list {{ height: 1fr; background: $ytm-base; padding: 0 1;
+    #list {{ height: 1fr; background: $ytm-base;
              scrollbar-size-vertical: 1; scrollbar-color: $ytm-s1; scrollbar-background: $ytm-base; }}
     #list > ListItem {{ background: $ytm-base; }}
     #list > ListItem.-highlight {{ background: $ytm-mantle; }}
     #list:focus > ListItem.-highlight {{ background: $ytm-s0; }}
+    #list:focus {{ background-tint: $ytm-base 0%; }}  /* the panel border shows focus */
 
-    #msg {{ height: 1; padding: 0 2; color: $ytm-peach; }}
-    #prompt {{ height: 3; margin: 0 1; background: $ytm-mantle; color: $ytm-text;
-               border: round $ytm-s1; padding: 0 1; }}
-    #prompt:focus {{ border: round $ytm-mauve; }}
+    #msg {{ height: 1; color: $ytm-peach; text-wrap: nowrap; text-overflow: ellipsis; }}
+    #prompt {{ height: 1; background: $ytm-base; color: $ytm-text; border: none; padding: 0; }}
     #prompt > .input--placeholder {{ color: $ytm-dim; }}
     #prompt > .input--cursor {{ background: $ytm-mauve; color: $ytm-crust; }}
-    #footer {{ height: 1; padding: 0 2; background: $ytm-crust; }}
+    #footer {{ height: 1; padding: 0 2; margin: 1 0 0 0; background: $ytm-crust; }}
+    Screen.tight #footer {{ margin: 0; }}
     """
     BINDINGS = [
         Binding("ctrl+space", "pause", priority=True),
@@ -308,42 +349,60 @@ class YtmApp(App):
         self.theme_spec = theme.normalize(theme.DEFAULT)
         self.song_feats = {}       # features of the song playing (headline, blurb...)
         self._played = None        # (video id, last position, duration) for skip logging
-        self.layout = "classic"
+        self.layout = "classic"     # the layout on screen (the theme's, if the window fits it)
+        self._log = []              # recent messages, shown in the dashboard's ask panel
         self._phase = 0.0           # animation clock, advances only while playing
         self._bar_width = None      # #info width the bar was last drawn for
 
     def compose(self) -> ComposeResult:
-        with Horizontal(id="now"):
-            yield Static("", id="art")
-            with Vertical(id="info"):
-                yield Static(id="motif")
-                yield Static(id="eq")
-                yield Static(id="title")
-                yield Static(id="artist")
-                yield Static(id="headline")
-                yield Static(id="bar")
-                with Horizontal(id="controls"):
-                    yield Btn("⏮", id="prev", tooltip="previous")
-                    yield Btn("⏯", id="pause", classes="big", tooltip="pause / play")
-                    yield Btn("⏭", id="next", tooltip="next")
-                    yield Btn("♥", id="like_now", tooltip="like")
-                    yield Btn("−", id="voldown", tooltip="volume down")
-                    yield Btn("+", id="volup", tooltip="volume up")
-                    yield Btn("∞", id="auto", tooltip="autoplay")
-                    yield Btn("◐", id="theme", tooltip="next theme")
-                    yield Btn("normal", id="vibe", tooltip="vibe: calm · normal · loud")
-        with Horizontal(id="tabs"):
-            for v in TABS + ["playlist"]:
-                yield Btn(v, id=f"t_{v}")
-        with Horizontal(id="actions"):
-            yield Btn("▶ play", id="r_play")
-            yield Btn("+ queue", id="r_queue")
-            yield Btn("♥ like", id="r_like")
-            yield Btn("≡ playlist", id="r_pl")
-            yield Btn("✕ remove", id="r_rm")
-        yield ListView(id="list")
-        yield Static(id="msg")
-        yield Input(placeholder="search a song, or type ? for help", id="prompt")
+        # Two columns: side by side in the dashboard, stacked (player, library, ask) otherwise.
+        with Container(id="body"):
+            with Vertical(id="left"):
+                with Vertical(id="player", classes="panel") as p:
+                    p.border_title = "now playing"
+                    with Horizontal(id="now"):
+                        yield Static("", id="art")
+                        with Vertical(id="info"):
+                            yield Static(id="motif")
+                            yield Static(id="eq")
+                            yield Static(id="title")
+                            yield Static(id="artist")
+                            yield Static(id="headline")
+                            yield Static(id="bar")
+                            with Horizontal(id="controls"):  # two rows in the dashboard
+                                with Horizontal():
+                                    yield Btn("⏮", id="prev", tooltip="previous")
+                                    yield Btn("⏯", id="pause", classes="big", tooltip="pause / play")
+                                    yield Btn("⏭", id="next", tooltip="next")
+                                    yield Btn("♥", id="like_now", tooltip="like")
+                                    yield Btn("−", id="voldown", tooltip="volume down")
+                                    yield Btn("+", id="volup", tooltip="volume up")
+                                with Horizontal():
+                                    yield Btn("∞", id="auto", tooltip="autoplay")
+                                    yield Btn("◐", id="theme", tooltip="next theme")
+                                    yield Btn("▦", id="layout", tooltip="layout: classic")
+                with Vertical(id="library", classes="panel") as p:
+                    p.border_title = "library"
+                    with Horizontal(id="tabs"):
+                        for v in TABS + ["playlist"]:
+                            yield Btn(v, id=f"t_{v}")
+                    with Horizontal(id="actions"):
+                        yield Btn("▶ play", id="r_play")
+                        yield Btn("+ queue", id="r_queue")
+                        yield Btn("♥ like", id="r_like")
+                        yield Btn("≡ playlist", id="r_pl")
+                        yield Btn("✕ remove", id="r_rm")
+                    yield ListView(id="list")
+            with Vertical(id="right"):
+                with Vertical(id="ask", classes="panel") as p:
+                    p.border_title = "ask"
+                    yield Static(id="log")
+                    yield Static(id="msg")
+                    yield Input(placeholder="search a song, or type ? for help", id="prompt")
+                with Vertical(id="viz", classes="panel") as p:
+                    p.border_title = "visualizer"
+                    yield Static(id="viz_eq")
+                    yield Static(id="viz_cap")
         yield Static(id="footer")
 
     def on_mount(self):
@@ -351,14 +410,13 @@ class YtmApp(App):
         self.show("history")
         self.render_now()
         self.render_controls()
+        self.apply_layout()
         self.query_one("#art").update(self.empty_art())
         self.set_interval(0.25, self.tick)
         self.query_one("#prompt").focus()
         vibe = context.usual_vibe(self.lib)  # the vibe you usually settle on at this time of day
         if vibe and vibe != self.vibe:
-            self.vibe = vibe
-            for b in self.query("#vibe"):
-                b.label = vibe
+            self.vibe = vibe  # vibe is command-only now; apply_theme also picks its layout
             self.apply_theme()
         r = context.resume(self.lib)  # last session ended mid-song: load it paused, never play sound
         if r:
@@ -388,14 +446,14 @@ class YtmApp(App):
             self.player.close()
 
     def on_resize(self, event):
-        self.fit_art()
+        self.apply_layout()
         self.call_after_refresh(self.render_now)  # widths are only known after layout
 
     def fit_art(self):
         """Show art only when there's room (big hero art only when tall). Runs on resize,
         theme change and every tick, so the bar's width never waits for the next second."""
         roomy = self.size.width >= 70 and self.size.height >= 26
-        tall = self.size.width >= 100 and self.size.height >= 36  # room for 40x20 hero art
+        tall = self.size.width >= 100 and self.size.height >= 40  # room for 40x20 hero art (and a list)
         if self.main.has_class("tall") != tall:
             self.main.set_class(tall, "tall")
             if self.layout == "hero":
@@ -452,17 +510,60 @@ class YtmApp(App):
             self.theme_spec = theme.normalize(spec)
         t = theme.apply_vibe(self.theme_spec, self.vibe)
         C.update(theme.colors(t))
-        if t["layout"] != self.layout:
-            self.layout = t["layout"]
-            self._art_id = None  # art size depends on layout: fetch again
-            self.update_art()
-        for name in theme.LAYOUTS:
-            self.main.set_class(name == self.layout, f"layout-{name}")
-        self.fit_art()
+        self.apply_layout()
         self.refresh_css()
         self.fill_list()
         self.render_footer()
         self.render_now()
+
+    def fits(self, layout):
+        """Whether the window is big enough for a layout (only the dashboard needs room)."""
+        w, h = DASH_MIN
+        return layout != "dashboard" or (self.size.width >= w and self.size.height >= h)
+
+    def apply_layout(self):
+        """Show the theme's layout, or classic when the window is too small for it."""
+        want = theme.apply_vibe(self.theme_spec, self.vibe)["layout"]
+        lay = want if self.fits(want) else "classic"
+        if lay != self.layout:
+            self.layout = lay
+            self._art_id = None  # art size depends on layout: fetch again
+            self.update_art()
+        for name in theme.LAYOUTS:
+            self.main.set_class(name == lay, f"layout-{name}")
+        self.main.set_class(self.size.height < 28, "tight")  # panels lose their gaps
+        tip = f"layout: {lay}" + (f" ({want} needs {DASH_MIN[0]}x{DASH_MIN[1]})" if lay != want else "")
+        if self.query_one("#layout").tooltip != tip:
+            self.query_one("#layout").tooltip = tip
+        self.fit_art()
+
+    def pick_layout(self, name=None):
+        """Instant control: the next layout that fits (name=None), or a named one.
+        Stored in the theme spec, so it stays across songs unless can_change allows 'layout'."""
+        if name is None:
+            names = [n for n in theme.LAYOUTS if self.fits(n)]
+            name = names[(names.index(self.layout) + 1) % len(names)] if self.layout in names else names[0]
+        elif name not in theme.LAYOUTS:
+            self.say(f"no layout {escape(name)} · try {' · '.join(theme.LAYOUTS)}")
+            return
+        self.vibe = "normal"  # calm and loud force their own layout
+        self.theme_spec = {**self.theme_spec, "layout": name}
+        self.apply_theme()
+        self.lib.log("layout", self.current_id() or "", to=name)
+        small = "" if self.layout == name else f" · needs {DASH_MIN[0]}x{DASH_MIN[1]}, showing {self.layout} for now"
+        self.say(f"▦ {name}{small}")
+
+    def set_vibe(self, vibe=None):
+        """Instant control: calm strips decoration, loud adds it."""
+        if vibe is None:
+            vibe = theme.VIBES[(theme.VIBES.index(self.vibe) + 1) % len(theme.VIBES)]
+        elif vibe not in theme.VIBES:
+            self.say(f"no vibe {escape(vibe)} · try {' · '.join(theme.VIBES)}")
+            return
+        self.vibe = vibe
+        self.apply_theme()
+        self.lib.log("vibe", self.current_id() or "", to=self.vibe)
+        self.say(f"vibe {self.vibe}")
 
     def library_themes(self):
         return theme.PRESETS + self.lib.themes()
@@ -561,7 +662,7 @@ class YtmApp(App):
         if self._ticks % 8 == 0 and self.settings.reload():  # every 2 s: pick up hand edits
             self.say(escape(self.settings.error) if self.settings.error else "⚙ settings reloaded")
             self.render_footer()
-        self.fit_art()
+        self.apply_layout()  # also on resize, but the new size can arrive a moment later
         if self.query_one("#info").content_size.width != self._bar_width:
             self.render_now()  # layout moved (resize, art shown/hidden, new theme): redraw the bar
         motion = self.settings["motion"]
@@ -575,6 +676,12 @@ class YtmApp(App):
         if self.layout == "stage":
             energy = self.song_feats.get("energy", 0.5)
             self.query_one("#eq").update(theme.equaliser(width, 3, self._phase, energy))
+        if self.layout == "dashboard":
+            eq, f = self.query_one("#viz_eq"), self.song_feats
+            energy = f.get("energy", 0.5)
+            eq.update(theme.equaliser(eq.content_size.width, max(1, eq.content_size.height), self._phase, energy))
+            cap = [t["name"], f.get("mood"), f.get("energy") is not None and f"energy {int(energy * 100)}%"]
+            self.query_one("#viz_cap").update(escape(" · ".join(x for x in cap if x)))
 
     # ---- the song that's playing ----
     def current_id(self):
@@ -620,7 +727,7 @@ class YtmApp(App):
         else:
             title, artist = "Nothing playing", "search for a song below to start"
         t = theme.apply_vibe(self.theme_spec, self.vibe)
-        self.query_one("#title").update(escape(theme.spaced(title) if t["layout"] == "hero" else title))
+        self.query_one("#title").update(escape(theme.spaced(title) if self.layout == "hero" else title))
         self.query_one("#artist").update(escape(artist))
         width = self._bar_width = self.query_one("#info").content_size.width
         f = self.song_feats
@@ -750,6 +857,11 @@ class YtmApp(App):
 
     def say(self, text):
         self.query_one("#msg").update(text)
+        if text and text not in self._log[-1:]:
+            self._log = (self._log + [text])[-20:]
+        log = self.query_one("#log")
+        older = [x for x in self._log if x != text]
+        log.update("\n".join(older[-max(1, log.content_size.height):]))
 
     # ---- adding music ----
     def play_tracks(self, tracks, replace):
@@ -910,6 +1022,10 @@ class YtmApp(App):
                 self.change_setting(cmd, arg)
             elif cmd == "cost":
                 self.cost_report()
+            elif cmd == "layout":
+                self.pick_layout(arg.lower() or None)
+            elif cmd == "vibe":
+                self.set_vibe(arg.lower() or None)
             elif cmd in ("help", "?"):
                 self.action_help()
             elif URL_RE.match(line):
@@ -950,11 +1066,8 @@ class YtmApp(App):
             self.restyle(self.theme_named(nxt))
             self.lib.log("theme_cycle", self.current_id() or "", to=nxt)
             self.say(f"◐ {escape(nxt)}")
-        elif bid == "vibe":  # instant: calm strips decoration, loud adds it
-            self.vibe = theme.VIBES[(theme.VIBES.index(self.vibe) + 1) % len(theme.VIBES)]
-            event.button.label = self.vibe
-            self.apply_theme()
-            self.lib.log("vibe", self.current_id() or "", to=self.vibe)
+        elif bid == "layout":  # instant: next layout that fits the window
+            self.pick_layout()
         elif bid == "like_now":
             t = self.current_track()
             self.like(t) if t else self.say("nothing playing")
