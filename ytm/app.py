@@ -136,7 +136,19 @@ class Btn(Button, can_focus=False):
     """A one-line button that doesn't steal focus from the list or prompt."""
 
 
-class Row(ListItem):
+class Item(ListItem):
+    """A list row. One click only highlights it, so the row buttons (+ queue ...) act on it;
+    a double click opens it, like Enter."""
+
+    def _on_click(self, event):
+        if event.chain < 2:
+            event.prevent_default()  # ListItem's own handler would select (play) it
+            lv = self.parent
+            lv.focus()
+            lv.index = lv.children.index(self)
+
+
+class Row(Item):
     def __init__(self, track: Track, num: int, current=False, liked=False):
         title, artist = (escape(x) for x in track_parts(track))
         if current:
@@ -151,7 +163,7 @@ class Row(ListItem):
         self.track = track
 
 
-class PlaylistRow(ListItem):
+class PlaylistRow(Item):
     def __init__(self, name, count):
         super().__init__(Label(f"[{C['mauve']}]≡[/]  [b]{escape(name)}[/]  [{C['dim']}]{songs(count)}[/]"))
         self.name_ = name

@@ -1,0 +1,82 @@
+[
+ {
+  "why": "A single mouse click on a search result (or history/liked row) fires ListView.Selected, so it plays the song and replaces the whole queue at once. A mouse user can't pick a row first and then press '+ queue': the queue they built is already gone.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "Alpha",
+    "artist": "A"
+   },
+   {
+    "id": "bbbbbbbbbbb",
+    "title": "Beta",
+    "artist": "B"
+   }
+  ],
+  "results": [
+   {
+    "id": "rrrrrrrrrrr",
+    "title": "Found",
+    "artist": "R"
+   }
+  ],
+  "settings": {
+   "mode": "off"
+  },
+  "steps": [
+   "auto off",
+   "search x",
+   {
+    "click": "#list > ListItem:last-child"
+   },
+   {
+    "click": "#r_queue"
+   },
+   "queue"
+  ],
+  "expect": [
+   "Alpha",
+   "Beta",
+   "Found"
+  ],
+  "name": "click-result-wipes-queue"
+ },
+ {
+  "name": "click-result-wipes-queue-double",
+  "why": "A double click still plays the row, like Enter.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "Alpha",
+    "artist": "A"
+   },
+   {
+    "id": "bbbbbbbbbbb",
+    "title": "Beta",
+    "artist": "B"
+   }
+  ],
+  "results": [
+   {
+    "id": "rrrrrrrrrrr",
+    "title": "Found",
+    "artist": "R"
+   }
+  ],
+  "settings": {
+   "mode": "off"
+  },
+  "steps": [
+   "auto off",
+   "search x",
+   {
+    "click": "#list > ListItem:last-child",
+    "times": 2
+   },
+   "queue"
+  ],
+  "expect": [
+   "▶  Found"
+  ]
+ }
+]
