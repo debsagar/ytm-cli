@@ -11,7 +11,7 @@ ytm.cmd [args]
 ├─ .venv\Scripts\python.exe missing → :setup        (first run: needs uv, then `uv sync -q --frozen --no-dev`)
 ├─ here                 → :app → python -m ytm      (in this terminal)
 ├─ import <urls>        → python -m ytm.importer import <urls>   (the "import" word is passed too and skipped)
-├─ update               → python -m ytm.update      (kept on one line: the update may rewrite ytm.cmd while cmd reads it)
+├─ update [stable|dev]  → python -m ytm.update "%~2"   (kept on one line: the update may rewrite ytm.cmd while cmd reads it)
 ├─ any other args       → :classic
 │    powershell ytm.ps1 %*   resolves the request, writes 3 lines to %YTM_OUT%: mpv path, URL, extra mpv options
 │    then cmd starts mpv --config-dir=<repo>\mpv <extra> -- <url>   (no PowerShell left in memory)
@@ -28,7 +28,7 @@ ytm.cmd [args]
 
 ### The other modules
 
-- `python -m ytm.update` → `ytm/update.py:main`: `git fetch`, then `checkout --detach origin/main` on a detached HEAD or `pull --ff-only` on a branch, then `uv sync --frozen --no-dev`. Prints the new version.
+- `python -m ytm.update [stable|dev]` → `ytm/update.py:main`: `git fetch`. With no word, `checkout --detach origin/main` on a detached HEAD or `pull --ff-only` on a branch. With `stable` or `dev` (`main` or `dev`), `switch`: `pull --ff-only` if already on it, else `fetch origin <b>:<b>` (creates or fast-forwards the local branch), `checkout <b>` and set it to track `origin/<b>`. Then `uv sync --frozen --no-dev`. Prints the new version and channel. Any other word prints usage and changes nothing.
 - `python -m ytm.importer <urls> [--judge]` → `ytm/importer.py:main` → `import_playlist` (`search._api().get_playlist` → `Library.add_to_playlist`). `--judge` calls `brain.budget` and then `brain.think` once per new song, on the main thread. No UI is running.
 - `python -m ytm.context [state|jev|theme|widget|profile] [video id]` → `ytm/context.py:main` prints `state(lib)` or `slice_for(...)` and their sizes. It reads the library and makes no network calls.
 

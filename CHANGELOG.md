@@ -6,6 +6,7 @@ All notable changes to this project are documented here. Versions follow [Semant
 
 ### Added
 - One-command install: `irm https://raw.githubusercontent.com/debsagar/ytm-cli/main/install.ps1 | iex` installs missing dependencies with winget, clones ytm into `%LOCALAPPDATA%\ytm`, sets up its packages and adds the `ytm` command. Running it again updates.
+- Update channels: `stable` (the `main` branch) and `dev` (latest features). `ytm update dev` switches your copy to dev and `ytm update stable` takes it back, packages included; `ytm update` follows the channel you're on. Data and settings are never touched.
 
 ## [0.5.1] - 2026-10-19
 

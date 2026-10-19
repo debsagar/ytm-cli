@@ -139,6 +139,7 @@ Sources: git history, CHANGELOG, README, `dev/README.md`, `docs/context.md`, the
 | D80 | 2026-10-19 | human | Show UI progress quickly with screenshots opened on the user's screen | "I WANT TO SEE TUI UPDATES MAN"; "i dont see the picture in the ss you sent" | active |
 | D81 | 2026-10-19 | model | Use cheaper models for chores (Sonnet, Haiku) and Opus for design-heavy work | Cost | active |
 | D82 | 2026-10-19 | human | Keep a decisions log (this file) and a flow-of-execution doc (`docs/flow.md`), check the plan's priors, and clean up redundant code | Asked for alongside the playground build order | active |
+| D83 | 2026-10-19 | human | `main` is stable and `dev` gets new features first; `ytm update dev` switches a copy to dev, `ytm update stable` goes back | "Add one option to go back to a stable release. Mark main as stable." The user runs dev on the real install and needs a way back if it breaks | active |
 
 ---
 

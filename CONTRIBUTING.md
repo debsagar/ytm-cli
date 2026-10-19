@@ -19,8 +19,9 @@ Run it with `ytm` (own small window) or `ytm here` (current terminal). See the R
 
 ## Branches and pull requests
 
-- `main` holds releases. The owner merges `dev` into `main` and tags `vX.Y.Z` ([semver](https://semver.org)). Bump the version in both `ytm/__init__.py` and `pyproject.toml`, then run `uv lock`.
-- `dev` is the integration branch.
+- `dev` is where work lands: the integration branch, and the `dev` channel users get with `ytm update dev`.
+- `main` is the stable channel. Merging `dev` into `main` is the stable release: the owner merges it and tags `vX.Y.Z` ([semver](https://semver.org)). Bump the version in both `ytm/__init__.py` and `pyproject.toml`, then run `uv lock`. `ytm update stable` takes users back to `main`, so keep it working.
+- Older stable code must still open a database and settings file that dev has touched: add columns and settings, don't rename or remove them.
 - Do each change on a short branch (`feat/...`, `fix/...`, `chore/...`) and open a pull request into `dev`. Merge once CI is green.
 
 ## Before opening a PR

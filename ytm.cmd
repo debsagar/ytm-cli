@@ -16,7 +16,7 @@ if /i "%~1"=="import" (
     exit /b
 )
 rem One line on purpose: cmd re-reads this file as it runs, and the update replaces it.
-if /i "%~1"=="update" (pushd "%~dp0" & "%YTM_PY%" -m ytm.update & popd & exit /b)
+if /i "%~1"=="update" (pushd "%~dp0" & "%YTM_PY%" -m ytm.update "%~2" & popd & exit /b)
 if not "%~1"=="" goto classic
 where wt >nul 2>nul || goto app
 rem wt treats ";" as a command separator, so escape it in the paths it gets
