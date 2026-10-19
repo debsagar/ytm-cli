@@ -68,7 +68,7 @@ DEFAULT = {
     "blurb": "",
 }
 
-# The 12 seed themes. Each is a cluster centre: "centre" describes the typical song
+# The 13 seed themes. Each is a cluster centre: "centre" describes the typical song
 # (energy 0..1, mood weights, context tags) in the same terms Jev measures songs.
 def _t(name, for_, centre, bg, panel, accent, accent2, text, dim, motif, style, cursor="", label="{pos} / {dur}",
        layout="classic"):
@@ -217,7 +217,7 @@ def progress_label(theme, pos, dur):
     lap = min(laps, int(laps * pos / dur) + 1) if pos and dur else 1
     try:
         return theme["progress"]["label"].format(pos=fmt(pos), dur=fmt(dur), pct=pct, lap=lap, laps=laps)
-    except (KeyError, IndexError, ValueError):
+    except (KeyError, IndexError, ValueError, AttributeError, TypeError):  # LLM-written templates
         return f"{fmt(pos)} / {fmt(dur)}"
 
 

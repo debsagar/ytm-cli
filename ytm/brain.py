@@ -4,7 +4,7 @@ Jev measures every song once (energy, mood probabilities, context tags): a small
 vector that never depends on which themes exist. Themes are cluster centres in
 that space; code assigns each song to the nearest one. When at least MIN_CLUSTER
 songs sit far from every centre but close to each other, Haiku names and styles
-that new cluster. So the library starts at 12 themes and grows only with evidence.
+that new cluster. So the library starts at 13 themes and grows only with evidence.
 
 Keys come from ~/.config/ytm/secrets.env (outside the repo) or the environment."""
 

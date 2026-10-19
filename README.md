@@ -1,8 +1,8 @@
 ﻿# ytm
 
-A minimal-RAM YouTube Music player for the Windows terminal. Search, queue, start radio mixes and replay your history from a small mini-player window: no browser, no login.
+A minimal-RAM YouTube Music player for the Windows terminal. Search, queue, start radio mixes, like songs, build playlists and replay your history from a small mini-player window: no browser, no login. The player restyles itself for each song.
 
-Under the hood it is a single audio-only [mpv](https://mpv.io) process fed by [yt-dlp](https://github.com/yt-dlp/yt-dlp), controlled by a small [Textual](https://textual.textualize.io) app. Together they use about 100 MB of RAM.
+Under the hood it is a single audio-only [mpv](https://mpv.io) process fed by [yt-dlp](https://github.com/yt-dlp/yt-dlp), controlled by a small [Textual](https://textual.textualize.io) app. Together they use about 120 MB of RAM.
 
 ![ytm mini-player](docs/screenshot.png)
 
@@ -37,6 +37,8 @@ Under the hood it is a single audio-only [mpv](https://mpv.io) process fed by [y
    & $env:USERPROFILE\.venvs\ytm\Scripts\python.exe -m pip install -r C:\Tools\ytm\requirements.txt
    ```
 
+   This installs Textual, ytmusicapi and Pillow (for album art).
+
 4. Make `ytm` available from any terminal. Either add the clone folder to your `PATH`, or create a one-line forwarder in a folder that is already on it:
 
    ```powershell
@@ -53,11 +55,36 @@ ytm finds mpv in `C:\Program Files\MPV Player`, a `bin` folder inside the repo, 
 
 `ytm` with no arguments opens the player in its own small Windows Terminal window (`ytm here` opens it in the current terminal).
 
-- Type a song name and press Enter to search; pick a result with â†‘/â†“ and Enter.
-- `play <song>`, `queue <song>`, `radio <song>`, `skip`, `prev`, `pause`, `vol 40`, `remove 3`, `clear`, `quit`
-- Tab moves into the list: Enter plays, `a` adds to the queue, `d` removes from it, â†/â†’ switch between queue, history and results. Esc goes back to the prompt.
-- Ctrl+Space pause Â· Ctrl+N next Â· Ctrl+B previous Â· Ctrl+â†/â†’ seek
+- Type a song name and press Enter to search; pick a result with ↑/↓ and Enter.
+- `play <song>`, `queue <song>`, `radio <song>`, `like`, `save <name>`, `auto`, `skip`, `prev`, `pause`, `vol 40`, `remove 3`, `clear`, `quit`
+- Tab moves into the list: Enter plays, `a` adds to the queue, `l` likes, `s` adds to a playlist, `d` removes. ←/→ switch between the queue, history, liked, playlists and results tabs. Esc goes back to the prompt.
+- Every button and tab is clickable: playback, ♥ like, volume, autoplay, and actions for the selected song.
+- Ctrl+Space pause · Ctrl+N next · Ctrl+B previous · Ctrl+←/→ seek
 - Type `?` for the full help.
+
+### Themes and layouts
+
+Each song gets a theme: colours, a scrolling motif, a progress-bar style and one of four layouts: **classic** (album art and the song list), **hero** (big art and a spaced-out title), **stage** (an animated equaliser next to the art) or **focus** (just the song, centred). There are 13 built-in themes, such as *neon rave*, *rainy window* and *pit wall*.
+
+- **◐ theme** cycles through every theme.
+- **vibe** switches between calm (focus layout, no decoration), normal and loud (stage layout).
+
+Without the optional brain (below), songs keep the default look; both buttons still work.
+
+### Importing playlists
+
+```powershell
+ytm import https://music.youtube.com/playlist?list=... [more urls] [--judge]
+```
+
+This copies public or unlisted YouTube Music playlists into your local playlists. `--judge` also measures every new song with the brain now, so themes are ready before you press play.
+
+### The brain (optional)
+
+- [TypeSafe](https://typesafe.ai) **Jev** measures each song once: energy, mood and a few context tags (club, soundtrack, motorsport, South Asian). The result is cached, and plain code picks the nearest theme.
+- When 3 or more songs fit no theme but sit close to each other, an LLM (Claude Haiku via [OpenRouter](https://openrouter.ai)) designs a new theme for them, up to 24 themes in total.
+
+To turn it on, create `%USERPROFILE%\.config\ytm\secrets.env` (outside the repo) with one line per key: `TYPESAFE_API_KEY=` followed by your TypeSafe key, and `OPENROUTER_API_KEY=` followed by your OpenRouter key. Environment variables with the same names also work. Jev needs only `TYPESAFE_API_KEY`; without `OPENROUTER_API_KEY`, no new themes are written. With no keys at all, the brain is off and everything else works as normal.
 
 ## Classic commands
 
@@ -93,13 +120,15 @@ Include the artist in searches ("daft punk around the world"); search results on
 | `+` / `0` | Volume up |
 | `-` / `9` | Volume down |
 | `m` | Mute |
-| `â†’` / `â†` | Seek 5 s |
-| `â†‘` / `â†“` | Seek 1 min |
+| `→` / `←` | Seek 5 s |
+| `↑` / `↓` | Seek 1 min |
 | `s` | Toggle shuffle |
 
 ## History
 
 Every track that starts playing, including each song in a radio mix, is logged to `mpv\history.tsv` as time, URL and "Artist - Title". `ytm history` reads it back. Delete the file to clear your history; it is excluded from git.
+
+Likes, playlists, song measurements, themes and play/skip/theme/vibe events are kept in `data\ytm.db` (SQLite), also excluded from git.
 
 ## How it works
 
@@ -107,7 +136,11 @@ The mini-player (`ytm/` package):
 
 - `player.py` starts mpv hidden and controls it over its JSON IPC named pipe (one connection for commands, one for events).
 - `search.py` searches YouTube Music and builds radio mixes with [ytmusicapi](https://github.com/sigma67/ytmusicapi).
-- `library.py` reads play history.
+- `library.py` reads play history and keeps likes, playlists, song features, themes and events in SQLite.
+- `art.py` draws album art with half-block characters.
+- `theme.py` holds the theme format, the 13 seed themes, layouts, motifs and the equaliser.
+- `brain.py` asks Jev about songs, assigns themes by nearest cluster centre, and asks the LLM for new ones.
+- `importer.py` implements `ytm import`.
 - `app.py` is the Textual UI.
 
 The classic commands:
@@ -118,7 +151,7 @@ The classic commands:
 
 ## Limitations
 
-- No account access: liked songs, private playlists and age-restricted tracks won't play.
+- No account access: your YouTube Music likes and private playlists aren't available (likes and playlists here are local), and age-restricted tracks won't play.
 - Radio is capped at 100 tracks; uncapped mixes are ~700 entries and take about 20 s to start.
 - A pasted `watch?v=...&list=...` link plays only that one track; pure playlist and album URLs play in full.
 - Expect a few seconds' delay before the first track starts while yt-dlp resolves the stream.
