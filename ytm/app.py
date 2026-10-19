@@ -1015,7 +1015,11 @@ class YtmApp(App):
                 t = self.current_track()
                 self.like(t) if t else self.say("nothing playing")
             elif cmd == "save" and arg:
-                n = self.lib.add_to_playlist(arg, [tidy(t) for t in self.queue_tracks()])
+                tracks = self.queue_tracks()
+                if not tracks:
+                    self.say("nothing to save · the queue is empty")
+                    return
+                n = self.lib.add_to_playlist(arg, [tidy(t) for t in tracks])
                 self.say(f"≡ saved {songs(n)} to {escape(arg)}")
             elif cmd in ("skip", "next", "n"):
                 p.next()
