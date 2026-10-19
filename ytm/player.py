@@ -179,6 +179,7 @@ class Player:
     # ---- playback ----
     def play(self, url):
         self.command("loadfile", url, "replace")
+        self.command("set_property", "pause", False)  # play now, even after a paused resume
 
     def queue(self, url):
         self.command("loadfile", url, "append-play")

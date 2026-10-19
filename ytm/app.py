@@ -395,6 +395,7 @@ class YtmApp(App):
         self.theme_spec = theme.normalize(theme.DEFAULT)
         self.song_feats = {}       # features of the song playing (headline, blurb...)
         self._played = None        # (video id, last position, duration) for skip logging
+        self._unplayed = None      # a song loaded paused (resume): not a play until it plays
         self.layout = "classic"     # the layout on screen (the theme's, if the window fits it)
         self._log = []              # recent messages, shown in the dashboard's ask panel
         self._said = -math.inf      # when the user last got a reply (automatic notes wait 5 s after it)
@@ -486,11 +487,12 @@ class YtmApp(App):
             self.say(escape(self.settings.error or self.settings.bad))
 
     def on_unmount(self):
-        try:  # position at quit, for resume; must never block quitting
-            vid, pos, dur = self._played
-            self.lib.log("quit", vid, at=int(pos), dur=int(dur))
-        except Exception:
-            pass
+        vid, pos, dur = self._played or (None, None, None)
+        if vid and pos is not None and dur:  # position at quit, for resume
+            try:
+                self.lib.log("quit", vid, at=int(pos), dur=int(dur))
+            except Exception:  # (sqlite) must never block quitting
+                pass
         if hasattr(self, "player"):
             self.player.close()
 
@@ -539,8 +541,11 @@ class YtmApp(App):
             if self.view == "queue":
                 self.fill_list()
             self.maybe_autofill()
-        if name == "time-pos" and self.current_id():
-            self._played = (self.current_id(), value, self.state["duration"])
+        if name in ("time-pos", "duration") and self.current_id():  # paused, time-pos can come before duration
+            self._played = (self.current_id(), self.state["time-pos"], self.state["duration"])
+        if name == "pause" and value is False and self._unplayed and self._unplayed == self.current_id():
+            self.lib.log("play", self._unplayed)
+            self._unplayed = None
         if name in ("playlist-pos", "media-title"):
             if self.current_id() != self._art_id:
                 self.song_changed()
@@ -684,16 +689,19 @@ class YtmApp(App):
 
     def song_changed(self):
         """Log the play/skip of the previous song, then theme the new one."""
-        if self._played:
+        if self._played and self._played[0] != self._unplayed:  # never played: not a skip either
             vid, pos, dur = self._played
             if pos is not None and dur:
                 self.lib.log("skip" if pos < dur - 15 else "finish", vid, at=int(pos), dur=int(dur))
         vid = self.current_id()
-        self._played = None
+        self._played = self._unplayed = None
         self.song_feats = {}
         if not vid:
             return
-        self.lib.log("play", vid)
+        if self.state["pause"]:
+            self._unplayed = vid  # logged as a play when it starts playing
+        else:
+            self.lib.log("play", vid)
         self._songs_since += 1
         entries = self.player.playlist()
         pos = self.state["playlist-pos"] or 0
