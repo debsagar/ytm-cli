@@ -239,10 +239,12 @@ def describe(vs):
 def think(song, lib, llm=True):
     """Measure a song (cached), assign it to a theme, and (if llm) grow the library
     when a new cluster has formed. Returns the song's features, including 'theme'."""
-    lib.remember(song["id"], song["title"], song["artist"])
+    lib.remember(song["id"], song["title"], song["artist"], song.get("album", ""))
     f = lib.features(song["id"])
     if not f or "mood_p" not in f:
-        f = judge({"title": song["title"], "artist": song["artist"]}, lib, song["id"])
+        # Album only when known: features are cached per song, so this affects new judgments only.
+        album = song.get("album") or (lib.song(song["id"]) or {}).get("album")
+        f = judge({"title": song["title"], "artist": song["artist"], **({"album": album} if album else {})}, lib, song["id"])
     themes = all_themes(lib)
     assign(f, themes)
     lib.save_features(song["id"], f)

@@ -356,6 +356,11 @@ class YtmApp(App):
         self.query_one("#prompt").focus()
 
     def on_unmount(self):
+        try:  # position at quit, for resume; must never block quitting
+            vid, pos, dur = self._played
+            self.lib.log("quit", vid, at=int(pos), dur=int(dur))
+        except Exception:
+            pass
         if hasattr(self, "player"):
             self.player.close()
 

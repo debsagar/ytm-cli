@@ -13,7 +13,7 @@ HISTORY = HOME / "mpv" / "history.tsv"
 DB = HOME / "data" / "ytm.db"
 
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS tracks (id TEXT PRIMARY KEY, title TEXT, artist TEXT, duration TEXT);
+CREATE TABLE IF NOT EXISTS tracks (id TEXT PRIMARY KEY, title TEXT, artist TEXT, duration TEXT, album TEXT DEFAULT '');
 CREATE TABLE IF NOT EXISTS likes (id TEXT PRIMARY KEY, at REAL);
 CREATE TABLE IF NOT EXISTS playlists (name TEXT PRIMARY KEY, created REAL);
 CREATE TABLE IF NOT EXISTS playlist_items (
@@ -51,6 +51,9 @@ class Library:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.executescript(SCHEMA)
+        if "album" not in [r[1] for r in self.db.execute("PRAGMA table_info(tracks)")]:  # older databases
+            self.db.execute("ALTER TABLE tracks ADD COLUMN album TEXT DEFAULT ''")
+            self.db.commit()
         self.lock = threading.Lock()
 
     def _q(self, sql, args=()):
@@ -58,7 +61,8 @@ class Library:
             return self.db.execute(sql, args).fetchall()
 
     def _save(self, t: Track):
-        self._q("INSERT OR REPLACE INTO tracks VALUES (?,?,?,?)", (t.video_id, t.title, t.artist, t.duration))
+        self._q("INSERT OR REPLACE INTO tracks VALUES (?,?,?,?,?)",
+                (t.video_id, t.title, t.artist, t.duration, t.album))
 
     def _tracks(self, sql, args=()):
         return [Track(*row) for row in self._q(sql, args)]
@@ -78,7 +82,7 @@ class Library:
 
     def liked(self):
         return self._tracks(
-            "SELECT t.id, t.title, t.artist, t.duration FROM likes l JOIN tracks t ON t.id=l.id ORDER BY l.at DESC")
+            "SELECT t.id, t.title, t.artist, t.duration, t.album FROM likes l JOIN tracks t ON t.id=l.id ORDER BY l.at DESC")
 
     # ---- playlists ----
     def playlists(self):
@@ -101,7 +105,7 @@ class Library:
 
     def playlist(self, name):
         return self._tracks(
-            "SELECT t.id, t.title, t.artist, t.duration FROM playlist_items i JOIN tracks t ON t.id=i.id "
+            "SELECT t.id, t.title, t.artist, t.duration, t.album FROM playlist_items i JOIN tracks t ON t.id=i.id "
             "WHERE i.playlist=? ORDER BY i.pos", (name,))
 
     def remove_from_playlist(self, name, video_id):
@@ -121,15 +125,15 @@ class Library:
     def set_centre(self, name, vec):
         self._q("INSERT OR REPLACE INTO centres VALUES (?,?)", (name, json.dumps(vec)))
 
-    def remember(self, video_id, title, artist):
-        self._q("INSERT OR IGNORE INTO tracks VALUES (?,?,?,?)", (video_id, title, artist, ""))
+    def remember(self, video_id, title, artist, album=""):
+        self._q("INSERT OR IGNORE INTO tracks VALUES (?,?,?,?,?)", (video_id, title, artist, "", album))
 
     def all_features(self):
         return {vid: json.loads(d) for vid, d in self._q("SELECT id, data FROM features")}
 
     def song(self, video_id):
-        row = self._q("SELECT title, artist FROM tracks WHERE id=?", (video_id,))
-        return {"title": row[0][0], "artist": row[0][1]} if row else None
+        row = self._q("SELECT title, artist, album FROM tracks WHERE id=?", (video_id,))
+        return {"title": row[0][0], "artist": row[0][1], "album": row[0][2] or ""} if row else None
 
     def themes(self):
         return [json.loads(r[0]) for r in self._q("SELECT spec FROM themes ORDER BY created")]
