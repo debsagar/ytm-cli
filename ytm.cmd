@@ -19,10 +19,10 @@ rem One line on purpose: cmd re-reads this file as it runs, and the update repla
 if /i "%~1"=="update" (pushd "%~dp0" & "%YTM_PY%" -m ytm.update & popd & exit /b)
 if not "%~1"=="" goto classic
 where wt >nul 2>nul || goto app
-rem wt treats ";" as a command separator, so escape it in the folder path
+rem wt treats ";" as a command separator, so escape it in the paths it gets
 set "YTM_DIR=%~dp0."
 set "YTM_DIR=%YTM_DIR:;=\;%"
-start "" wt -w new --size 74,24 --title ytm -d "%YTM_DIR%" "%YTM_PY%" -m ytm
+start "" wt -w new --size 74,24 --title ytm -d "%YTM_DIR%" "%YTM_DIR%\.venv\Scripts\python.exe" -m ytm
 exit /b 0
 
 :app
