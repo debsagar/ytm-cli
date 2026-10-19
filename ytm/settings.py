@@ -4,6 +4,7 @@ Stored in ~/.config/ytm/settings.toml (outside the repo). Edit it by hand or wit
 `set <key> <value>` in the app; the file is re-read when it changes, so edits
 apply without a restart. Bad or missing values fall back to the defaults."""
 
+import difflib
 import math
 import re
 import time
@@ -65,6 +66,18 @@ def _parse(key, text):
     return text
 
 
+def _closest(key, text):
+    """The real key the user most likely meant; `set max themes 20` gives max_new_themes_week."""
+    words = [key.lower(), *text.lower().split()]
+    best = max(SPEC, key=lambda k: len(set(words) & set(k.split("_"))))  # most shared words
+    if set(words) & set(best.split("_")):
+        return best
+    for n in range(1, len(words) + 1):  # typos: "stickyness", "budget_dy"
+        if m := difflib.get_close_matches("_".join(words[:n]), SPEC, 1):
+            return m[0]
+    return None
+
+
 def _toml(v):
     if isinstance(v, str):
         return '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"'
@@ -111,7 +124,8 @@ class Settings:
     def set(self, key, text):
         """Change one setting from text typed in the app. Raises ValueError with a readable reason."""
         if key not in SPEC:
-            raise ValueError(f"unknown setting {key}; type `set` to see them all")
+            near = _closest(key, text)
+            raise ValueError(f"unknown setting {key}: " + (f"did you mean {near}?" if near else "type `set` to see them all"))
         self.values[key] = _valid(key, _parse(key, text.strip()))
         self.save()
         return self.values[key]

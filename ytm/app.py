@@ -255,6 +255,7 @@ class YtmApp(App):
     Screen.layout-dashboard #ask:focus-within {{ border: round $ytm-pink; }}
     Screen.layout-dashboard #viz {{ display: block; }}
     Screen.layout-dashboard #log {{ display: block; height: 1fr; }}
+    Screen.layout-dashboard #msg {{ height: auto; text-wrap: wrap; }}  /* the ask panel is narrow: wrap, the log above shrinks */
     Screen.layout-dashboard #motif {{ display: none; }}
     Screen.layout-dashboard #controls {{ layout: vertical; height: 2; }}
     #viz_eq {{ height: 1fr; color: $ytm-mauve; }}
