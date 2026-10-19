@@ -850,8 +850,14 @@ class YtmApp(App):
 
     def render_footer(self):
         if self.focused is self.query_one("#list"):
-            pairs = [("enter", "play"), ("a", "queue"), ("l", "like"), ("s", "playlist"),
-                     ("d", "remove"), ("←→", "tabs"), ("esc", "back")]
+            v = self.view  # only the keys that do something on this tab
+            if v == "playlists":
+                pairs = [("enter", "open"), ("a", "queue"), ("d", "delete")]
+            else:
+                pairs = [("enter", "play"), *([] if v == "queue" else [("a", "queue")]), ("l", "like"), ("s", "playlist")]
+                d = {"queue": "remove", "playlist": "remove", "liked": "unlike"}.get(v)
+                pairs += [("d", d)] if d else []
+            pairs += [("←→", "tabs"), ("esc", "back")]
         else:
             pairs = [("enter", "search"), ("tab", "list"), ("^space", "pause"), ("^n", "next"), ("?", "help")]
         _, _, why = brain.budget(self.lib, self.settings)
@@ -922,6 +928,7 @@ class YtmApp(App):
         self.call_after_refresh(setattr, lv, "index", index)  # once the new rows are mounted
         self.render_tabs()
         self.render_actions()
+        self.render_footer()
 
     def show(self, view):
         if view != self.view:
@@ -1225,6 +1232,10 @@ class YtmApp(App):
             elif self.view == "playlist":
                 self.lib.remove_from_playlist(self.open_playlist, t.video_id)
                 self.fill_list()
+            elif self.view == "liked":
+                self.like(t)  # unlike
+            else:
+                self.say("d removes from the queue or a playlist")
 
     def action_tab(self, step):
         if self.focused is not self.query_one("#list"):
