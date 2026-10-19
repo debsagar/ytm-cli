@@ -17,7 +17,7 @@ from textual.markup import escape as _escape  # noqa: E402
 from textual.screen import ModalScreen  # noqa: E402
 from textual.widgets import Button, Input, Label, ListItem, ListView, Static  # noqa: E402
 
-from . import art, brain, library, search, settings, theme  # noqa: E402
+from . import art, brain, context, library, search, settings, theme  # noqa: E402
 from .player import Player  # noqa: E402
 from .search import Track  # noqa: E402
 
@@ -354,6 +354,29 @@ class YtmApp(App):
         self.query_one("#art").update(self.empty_art())
         self.set_interval(0.25, self.tick)
         self.query_one("#prompt").focus()
+        vibe = context.usual_vibe(self.lib)  # the vibe you usually settle on at this time of day
+        if vibe and vibe != self.vibe:
+            self.vibe = vibe
+            for b in self.query("#vibe"):
+                b.label = vibe
+            self.apply_theme()
+        r = context.resume(self.lib)  # last session ended mid-song: load it paused, never play sound
+        if r:
+            s = self.lib.song(r["id"]) or {"title": r["id"], "artist": ""}
+            self.known[r["id"]] = t = Track(r["id"], s["title"], s["artist"])
+            try:
+                self.player.command("set_property", "pause", True)
+                self.player.command("loadfile", t.url, "replace", -1, f"start={r['at']}")  # mpv ≥ 0.38
+                note = f"resume · {escape(s['title'])} at {fmt_time(r['at'])} · press ⏯"
+                self.set_timer(2, lambda: self.say(note))  # shortcut: after the song's theme note, not ordered
+            except RuntimeError:
+                pass
+
+        def backlog():  # history-only songs get measured, one per 30 s, while playing and nothing else runs
+            if self.current_id() and not self.state["pause"] and not any(w.is_running for w in self.workers):
+                self.run_worker(lambda: brain.measure_next(self.lib, self.settings) is False
+                                and self.call_from_thread(timer.stop), thread=True, group="backlog", exit_on_error=False)
+        timer = self.set_interval(30, backlog)
 
     def on_unmount(self):
         if hasattr(self, "player"):
@@ -460,7 +483,7 @@ class YtmApp(App):
                 return
             if not self.lib.features(vid):
                 self.call_from_thread(self.say, "✦ reading the song …")
-            feats = brain.think(self.song_dict(vid), self.lib, llm)
+            feats = brain.with_look(self.lib, vid, brain.think(self.song_dict(vid), self.lib, llm))
             if vid == self.current_id():
                 self.call_from_thread(self.show_song_theme, feats)
             if jev and next_vid and not self.lib.features(next_vid):
@@ -759,7 +782,7 @@ class YtmApp(App):
     @work(thread=True, group="autoplay")
     def autofill(self, seed, existing):
         try:
-            new = [t for t in search.radio(seed, limit=30) if t.video_id not in existing][:10]
+            new = context.rerank(self.lib, [t for t in search.radio(seed, limit=30) if t.video_id not in existing])[:10]
             if new:
                 self.call_from_thread(self.play_tracks, new, False)
                 self.call_from_thread(self.say, f"autoplay · added {len(new)} similar {'song' if len(new) == 1 else 'songs'}")
@@ -790,7 +813,7 @@ class YtmApp(App):
                 self.call_from_thread(self.say, "")
                 self.call_from_thread(self.query_one("#list").focus)
             elif action == "radio":
-                tracks = search.radio(top.video_id) or [top]
+                tracks = context.rerank(self.lib, search.radio(top.video_id) or [top], seed=top.video_id)
                 self.call_from_thread(self.play_tracks, tracks, True)
                 self.call_from_thread(self.show, "queue")
                 self.call_from_thread(self.say, f"radio · {songs(len(tracks))} queued")

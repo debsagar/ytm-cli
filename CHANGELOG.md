@@ -14,6 +14,11 @@ All notable changes to this project are documented here. Versions follow [Semant
   - `llm_model` picks the OpenRouter model that writes themes. Theme calls now turn reasoning off and cap output at 600 tokens, about a third cheaper per theme.
 - The help popup scrolls when the window is short.
 - `ytm/context.py` builds what the app knows about you (taste, playlists as contexts, skips, time of day, the latest session) from the library, history and events, with no LLM calls, and gives each model a small capped slice of it. New themes are now written with this slice instead of a plain list of artists. `python -m ytm.context` prints the slices. See `docs/context.md`.
+- ytm learns you, in code with no LLM (see `docs/context.md`):
+  - autoplay and `radio` re-rank YouTube's mix: artists and kinds of songs you skip early move down, songs like your current session (or, for `radio`, like the seed song) move up;
+  - the look you settle on after cycling themes is used again for that song and very similar ones;
+  - launch resumes a song you left mid-way, paused at its position (press ⏯), and starts in the vibe you usually pick at that time of day;
+  - songs known only from history are measured by Jev in the background, one every 30 s while playing, within the budget.
 - Cost tracking: every Jev and LLM call is logged with its tokens and price. The footer shows today's spend, and `cost` breaks it down by today, this month and all time.
 
 ### Changed
