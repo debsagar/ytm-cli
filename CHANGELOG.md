@@ -4,9 +4,16 @@ All notable changes to this project are documented here. Versions follow [Semant
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-10-19
+
 ### Added
 - One-command install: `irm https://raw.githubusercontent.com/debsagar/ytm-cli/main/install.ps1 | iex` installs missing dependencies with winget, clones ytm into `%LOCALAPPDATA%\ytm`, sets up its packages and adds the `ytm` command. Running it again updates.
 - Update channels: `stable` (the `main` branch) and `dev` (latest features). `ytm update dev` switches your copy to dev and `ytm update stable` takes it back, packages included; `ytm update` follows the channel you're on. Data and settings are never touched.
+
+### Fixed
+- Resume could pick the wrong song when two events landed in the same millisecond.
+- The `vol` hint said 0-130; volume is capped at 100.
+- Removed dead and duplicated code; added `docs/flow.md` (how ytm runs) and `docs/decisions.md` (why it is the way it is).
 
 ## [0.5.1] - 2026-10-19
 
@@ -89,6 +96,7 @@ All notable changes to this project are documented here. Versions follow [Semant
 - Play history (`ytm history`), logged by an mpv Lua script.
 - Minimal-RAM setup: audio-only mpv with a small cache; PowerShell exits before playback.
 
+[0.5.2]: https://github.com/debsagar/ytm-cli/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/debsagar/ytm-cli/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/debsagar/ytm-cli/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/debsagar/ytm-cli/compare/v0.3.0...v0.4.0
