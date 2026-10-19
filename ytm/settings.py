@@ -11,6 +11,7 @@ import tomllib
 from pathlib import Path
 
 PATH = Path.home() / ".config" / "ytm" / "settings.toml"
+MODEL_ID = re.compile(r"[\w.-]+/[\w.:-]+")
 RESTYLE = re.compile(r"^(song|pinned|every \d+|\d+min)$")
 
 # key: (default, allowed values or a type, explanation)
@@ -24,6 +25,7 @@ SPEC = {
     "can_change": (["colours", "motif", "layout"], ["colours", "motif", "layout"], "what a restyle may touch"),
     "motion": ("full", ["full", "low", "off"], "animation: full · low (1 frame a second) · off"),
     "grow_themes": ("auto", ["auto", "never"], "let the LLM write new themes for new kinds of songs"),
+    "llm_model": ("anthropic/claude-haiku-5.5", MODEL_ID, "OpenRouter model that writes themes, e.g. google/gemini-2.5-flash-lite"),
     "max_new_themes_week": (3, int, "cap on LLM-written themes per 7 days"),
 }
 

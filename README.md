@@ -111,6 +111,7 @@ Type `set` to see every setting and `set <key> <value>` to change one (`mode off
 | `can_change` | colours, motif, layout | Which parts a restyle may change; e.g. `set can_change colours` keeps your layout fixed |
 | `motion` | `full` | Animation: `full`, `low` (one frame a second) or `off` |
 | `grow_themes`, `max_new_themes_week` | `auto`, `3` | Whether and how often the LLM may write new themes |
+| `llm_model` | `anthropic/claude-haiku-5.5` | Any [OpenRouter](https://openrouter.ai/models) model id (`vendor/name`) that supports JSON output, used to write themes. Reasoning is switched off for the call; if the response has no cost, the logged price is estimated at Haiku rates and marked `estimated` |
 
 ## Classic commands
 
