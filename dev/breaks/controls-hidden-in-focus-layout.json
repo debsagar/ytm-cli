@@ -1,0 +1,20 @@
+{
+ "why": "In the focus layout (velvet, campfire, rainy window, or vibe calm) #info is 80% wide, so the controls row clips off '◐ theme' and 'vibe' and a mouse user can't leave calm or cycle themes. (Fixed by icon labels; vibe shows its current mood.) (The vibe button became the ▦ layout button, which also leaves calm.)",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "Song",
+   "artist": "A"
+  }
+ ],
+ "steps": [
+  "vibe calm",
+  {
+   "click": "#layout"
+  }
+ ],
+ "expect": [
+  "◐",
+  "▦ classic"
+ ]
+}

@@ -4,12 +4,14 @@ Stored in ~/.config/ytm/settings.toml (outside the repo). Edit it by hand or wit
 `set <key> <value>` in the app; the file is re-read when it changes, so edits
 apply without a restart. Bad or missing values fall back to the defaults."""
 
+import math
 import re
 import time
 import tomllib
 from pathlib import Path
 
 PATH = Path.home() / ".config" / "ytm" / "settings.toml"
+MODEL_ID = re.compile(r"[\w.-]+/[\w.:-]+")
 RESTYLE = re.compile(r"^(song|pinned|every \d+|\d+min)$")
 
 # key: (default, allowed values or a type, explanation)
@@ -23,6 +25,7 @@ SPEC = {
     "can_change": (["colours", "motif", "layout"], ["colours", "motif", "layout"], "what a restyle may touch"),
     "motion": ("full", ["full", "low", "off"], "animation: full · low (1 frame a second) · off"),
     "grow_themes": ("auto", ["auto", "never"], "let the LLM write new themes for new kinds of songs"),
+    "llm_model": ("anthropic/claude-haiku-5.5", MODEL_ID, "OpenRouter model that writes themes, e.g. google/gemini-2.5-flash-lite"),
     "max_new_themes_week": (3, int, "cap on LLM-written themes per 7 days"),
 }
 
@@ -31,17 +34,17 @@ def _valid(key, v):
     """v if it's an acceptable value for key, else raise ValueError."""
     default, rule, _ = SPEC[key]
     if rule is float or rule is int:
-        if isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0:
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0:
             raise ValueError(f"{key} must be a number ≥ 0")
         if key == "stickiness" and v > 1:
             raise ValueError("stickiness goes from 0 to 1")
         return rule(v)
     if isinstance(rule, re.Pattern):
-        if not isinstance(v, str) or not rule.match(v):
+        if not isinstance(v, str) or not rule.fullmatch(v):
             raise ValueError(f"{key}: {SPEC[key][2]}")
         return v
     if isinstance(default, list):  # a subset of the allowed values
-        if not isinstance(v, list) or not set(v) <= set(rule):
+        if not isinstance(v, list) or not all(isinstance(x, str) and x in rule for x in v):
             raise ValueError(f"{key}: pick from {', '.join(rule)}")
         return v
     if v not in rule:
@@ -93,7 +96,7 @@ class Settings:
         data = {}
         if mtime is not None:
             try:
-                data = tomllib.loads(self.path.read_text(encoding="utf-8"))
+                data = tomllib.loads(self.path.read_text(encoding="utf-8-sig"))  # Notepad adds a BOM
                 self.error = None
             except (tomllib.TOMLDecodeError, UnicodeDecodeError) as e:
                 self.error = f"settings.toml: {e}"  # keep the last good values

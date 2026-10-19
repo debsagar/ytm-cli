@@ -1,0 +1,9 @@
+{
+ "why": "fill_list checks `if not lv.children` right after lv.clear(), whose removal is still pending, so the 'no liked songs yet' / 'nothing here' hint is often skipped and the list is just blank.",
+ "steps": [
+  "liked"
+ ],
+ "expect": [
+  "no liked songs"
+ ]
+}

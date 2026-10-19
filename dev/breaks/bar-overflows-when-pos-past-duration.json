@@ -1,0 +1,22 @@
+{
+ "why": "progress_bar doesn't clamp pos to [0, dur]: time-pos past the duration draws a bar longer than the row (it wraps), and a negative one shows as '-1:53' with the label pushed to the next line.",
+ "theme": "neon rave",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "Song",
+   "artist": "A",
+   "duration": "3:20"
+  }
+ ],
+ "steps": [
+  {
+   "mpv": {
+    "time-pos": 500
+   }
+  }
+ ],
+ "absent": [
+  "████████████████████████████████████████████████"
+ ]
+}

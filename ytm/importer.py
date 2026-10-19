@@ -9,7 +9,7 @@ import re
 import sys
 
 from . import brain, library, settings
-from .search import Track, _api, _track
+from .search import _api, _track
 
 LIST_RE = re.compile(r"[?&]list=([\w-]+)")
 
@@ -36,7 +36,7 @@ def main(args):
                 if not jev:
                     print(f"  stopped judging: {why}")
                     break
-                f = brain.think({"id": t.video_id, "title": t.title, "artist": t.artist}, lib, llm)
+                f = brain.think({"id": t.video_id, "title": t.title, "artist": t.artist, "album": t.album}, lib, llm)
                 print(f"  {i:>3}/{len(tracks)} {t.title[:40]:40} {f['theme']} · {f['mood']} · {f['tags']}")
 
 

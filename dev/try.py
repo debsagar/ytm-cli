@@ -22,6 +22,7 @@ exits 1 if anything failed."""
 
 import argparse
 import asyncio
+import glob
 import io
 import json
 import os
@@ -123,7 +124,7 @@ def screen_text(app):
     c = Console(width=app.size.width, height=app.size.height, file=io.StringIO(),
                 record=True, legacy_windows=False, color_system=None)
     c.print(app.screen._compositor.render_update(full=True, screen_stack=app._background_screens))
-    return c.export_text()
+    return c.export_text().replace("\u200b", "")  # zero-width: invisible in a terminal
 
 
 async def run(sc, out, svg):
@@ -164,8 +165,9 @@ async def run(sc, out, svg):
     brain.think, brain.enabled = fake_think, lambda: True
     brain._post = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("dev/try.py: no network"))
 
-    app, errors, text = A.YtmApp(), [], ""
+    errors, text = [], ""
     try:
+        app = A.YtmApp()  # inside the try: a bad settings.toml can crash the constructor
         async with app.run_test(size=tuple(sc.get("size", [74, 24]))) as pilot:
             await pilot.pause(0.2)
             if isinstance(theme_in, dict):
@@ -221,7 +223,7 @@ async def main():
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     failed = 0
-    for f in a.files:
+    for f in [g for f in a.files for g in sorted(glob.glob(f)) or [f]]:  # PowerShell passes *.json unexpanded
         data = json.loads(Path(f).read_text(encoding="utf-8"))
         for i, sc in enumerate(data if isinstance(data, list) else [data]):
             sc.setdefault("name", f"{Path(f).stem}-{i}" if isinstance(data, list) else Path(f).stem)

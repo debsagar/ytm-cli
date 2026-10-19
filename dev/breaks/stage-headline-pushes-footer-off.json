@@ -1,0 +1,20 @@
+{
+ "why": "#headline wraps to as many lines as the brain's headline + blurb need, so in the stage layout at the real 74x24 window a 3-line one pushes the prompt and footer below the screen (and the scrollbar that appears wraps 'vol 70%').",
+ "theme": "neon rave",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "Song",
+   "artist": "A"
+  }
+ ],
+ "feats": {
+  "headline": "A slow-burning anthem that builds from a whisper to a stadium roar",
+  "blurb": "Layered synths, a pulsing bassline and a chorus made for singing along with the whole crowd at the very top of your lungs"
+ },
+ "expect": [
+  "search a song",
+  "? help",
+  "vol 70%"
+ ]
+}

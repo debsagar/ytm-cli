@@ -15,12 +15,12 @@ import time
 import urllib.request
 from pathlib import Path
 
-from . import settings, theme
+from . import context, settings, theme
 
 SECRETS = Path.home() / ".config" / "ytm" / "secrets.env"
 JEV_URL = "https://api.typesafe.ai/v1/systemone"
 LLM_URL = "https://openrouter.ai/api/v1/chat/completions"
-LLM_MODEL = "anthropic/claude-haiku-5.5"
+LLM_MODEL = "anthropic/claude-haiku-5.5"  # default of the llm_model setting
 
 # Tuned on 84 real songs after refine(): distance median 0.51, p90 0.70.
 OUTLIER = 0.6       # distance beyond which a song doesn't belong to any theme
@@ -57,10 +57,11 @@ def _post(url, key, body, timeout=20):
         return json.loads(r.read())
 
 
-def _spend(lib, api, tokens_in, tokens_out, usd, video_id=""):
+def _spend(lib, api, tokens_in, tokens_out, usd, video_id="", estimated=False):
     """Every paid call becomes a 'cost' event, so the UI and the budget cap can add them up."""
     if lib:
-        lib.log("cost", video_id, api=api, tokens_in=tokens_in, tokens_out=tokens_out, usd=usd)
+        extra = {"estimated": True} if estimated else {}
+        lib.log("cost", video_id, api=api, tokens_in=tokens_in, tokens_out=tokens_out, usd=usd, **extra)
 
 
 def budget(lib, s):
@@ -160,20 +161,24 @@ Return ONLY a JSON object:
 Keep text readable: bg/panel dark, text light, accent vivid."""
 
 
-def write_theme(songs, profile, existing, lib=None):
+def write_theme(songs, profile, existing, lib=None, model=None):
     if not _key("OPENROUTER_API_KEY"):
         return None
     prompt = WRITER_PROMPT.format(songs=json.dumps(songs), profile=json.dumps(profile),
                                   existing=", ".join(existing), motifs=list(theme.MOTIFS),
                                   styles=list(theme.PROGRESS))
     r = _post(LLM_URL, _key("OPENROUTER_API_KEY"), {
-        "model": LLM_MODEL, "max_tokens": 2000, "response_format": {"type": "json_object"},
+        "model": model or settings.Settings()["llm_model"], "max_tokens": 600,  # the JSON is ~250 tokens
+        "reasoning": {"effort": "none"},  # hidden reasoning is billed as output and tripled the cost
+        "response_format": {"type": "json_object"},
         "usage": {"include": True},  # ask OpenRouter to report the cost
         "messages": [{"role": "user", "content": prompt}]}, timeout=40)
     u = r.get("usage", {})
     tin, tout = u.get("prompt_tokens", 0), u.get("completion_tokens", 0)
-    _spend(lib, "llm", tin, tout, u.get("cost", tin * LLM_IN + tout * LLM_OUT))
-    text = r["choices"][0]["message"].get("content") or ""  # empty if reasoning used up max_tokens
+    cost = u.get("cost")  # missing: estimate from Haiku prices, which are wrong for other models
+    _spend(lib, "llm", tin, tout, cost if cost is not None else tin * LLM_IN + tout * LLM_OUT,
+           estimated=cost is None)
+    text = r["choices"][0]["message"].get("content") or ""  # empty if the model ran out of max_tokens
     if "{" not in text:
         return None
     return theme.normalize(json.loads(text[text.find("{"):text.rfind("}") + 1]))
@@ -192,7 +197,8 @@ def grow(lib, themes):
         if len(group) >= MIN_CLUSTER:
             songs = [s for s in (lib.song(o) for o, _ in group) if s]
             measured = describe([song_vec(g) for _, g in group])
-            spec = write_theme({"songs": songs, "measured": measured}, lib.profile(), [t["name"] for t in themes], lib)
+            spec = write_theme({"songs": songs, "measured": measured}, context.slice_for("theme", lib, ids=[o for o, _ in group]),
+                                 [t["name"] for t in themes], lib)
             if not spec or spec["name"] in {t["name"] for t in themes}:
                 return None
             vs = [song_vec(g) for _, g in group]
@@ -233,10 +239,12 @@ def describe(vs):
 def think(song, lib, llm=True):
     """Measure a song (cached), assign it to a theme, and (if llm) grow the library
     when a new cluster has formed. Returns the song's features, including 'theme'."""
-    lib.remember(song["id"], song["title"], song["artist"])
+    lib.remember(song["id"], song["title"], song["artist"], song.get("album", ""))
     f = lib.features(song["id"])
     if not f or "mood_p" not in f:
-        f = judge({"title": song["title"], "artist": song["artist"]}, lib, song["id"])
+        # Album only when known: features are cached per song, so this affects new judgments only.
+        album = song.get("album") or (lib.song(song["id"]) or {}).get("album")
+        f = judge({"title": song["title"], "artist": song["artist"], **({"album": album} if album else {})}, lib, song["id"])
     themes = all_themes(lib)
     assign(f, themes)
     lib.save_features(song["id"], f)
@@ -254,3 +262,32 @@ def recluster(lib):
     for vid, f in lib.all_features().items():
         if "mood_p" in f:
             lib.save_features(vid, assign(f, themes))
+
+
+def with_look(lib, vid, f):
+    """f with the look you settled on for this song (or a very close one) in place of its
+    nearest theme. It counts as a perfect fit, so restyle cadence, stickiness and can_change
+    still decide whether the look switches. Never saved: clustering keeps the nearest theme."""
+    name = context.look_for(lib, vid, f)
+    if not name or name == f.get("theme") or name not in {t["name"] for t in all_themes(lib)}:
+        return f
+    return {**f, "theme": name, "dist": 0.0, "chosen": True}
+
+
+def measure_next(lib, s):
+    """Measure one song known only from history, most played first. True when one was measured,
+    False when none are left, None when Jev isn't allowed right now or the call failed."""
+    if not budget(lib, s)[0]:
+        return None
+    st = context.state(lib)
+    todo = [v for v in st["_plays"] if v not in st["_feats"]]
+    if not todo:
+        return False
+    vid = max(todo, key=st["_plays"].get)
+    artist, sep, title = st["_names"].get(vid, vid).partition(" - ")
+    song = lib.song(vid) or ({"title": title, "artist": artist} if sep else {"title": artist, "artist": ""})
+    try:
+        think({"id": vid, **song}, lib, llm=False)
+    except Exception:  # shortcut: offline or API trouble is retried on the next tick, forever
+        return None
+    return True

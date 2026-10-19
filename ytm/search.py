@@ -20,6 +20,7 @@ class Track:
     title: str
     artist: str = ""
     duration: str = ""
+    album: str = ""
 
     @property
     def url(self):
@@ -32,7 +33,8 @@ class Track:
 
 def _track(item):
     artists = ", ".join(a["name"] for a in item.get("artists") or [] if a.get("name"))
-    return Track(item["videoId"], item.get("title", "?"), artists, item.get("duration") or item.get("length") or "")
+    album = (item.get("album") or {}).get("name") or ""
+    return Track(item["videoId"], item.get("title", "?"), artists, item.get("duration") or item.get("length") or "", album)
 
 
 def search(query, limit=10):

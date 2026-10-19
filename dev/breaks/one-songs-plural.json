@@ -1,0 +1,17 @@
+{
+ "why": "PlaylistRow and the `save` message always say 'N songs', so a one-song playlist reads '1 songs'.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  }
+ ],
+ "steps": [
+  "save solo",
+  "playlists"
+ ],
+ "absent": [
+  "1 songs"
+ ]
+}

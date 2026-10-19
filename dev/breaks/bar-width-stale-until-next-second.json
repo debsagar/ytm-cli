@@ -1,0 +1,30 @@
+{
+ "why": "render_now reads #info's width before layout settles (art is shown on the first frame, then hidden by tick), and nothing redraws the bar after that, so a paused song keeps a 25-cell bar on a 74-column window. (The player panel's border and padding take 2 more columns, so a full-width bar is now 45 cells.)",
+ "theme": "default",
+ "paused": true,
+ "size": [
+  74,
+  30
+ ],
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "Song",
+   "artist": "A"
+  }
+ ],
+ "steps": [
+  {
+   "resize": [
+    74,
+    24
+   ]
+  },
+  {
+   "wait": 1
+  }
+ ],
+ "expect": [
+  "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  0:30"
+ ]
+}
