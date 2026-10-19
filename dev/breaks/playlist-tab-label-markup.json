@@ -1,0 +1,14 @@
+[
+ {
+  "why": "render_tabs sets the open playlist's tab label to f'≡ {name}' unescaped; Button labels are markup, so a name with '[/]' crashes the app with MarkupError when you open it.",
+  "songs": [{"id": "aaaaaaaaaaa", "title": "Song", "artist": "A"}],
+  "steps": ["save a[/]b", "playlists", {"key": "tab"}, {"key": "enter"}],
+  "expect": ["≡ a[/]b"]
+ },
+ {
+  "why": "Same unescaped label: a name like '[chill]' shows as an empty tab.",
+  "songs": [{"id": "aaaaaaaaaaa", "title": "Song", "artist": "A"}],
+  "steps": ["save [chill]", "playlists", {"key": "tab"}, {"key": "enter"}],
+  "expect": ["≡ [chill]"]
+ }
+]

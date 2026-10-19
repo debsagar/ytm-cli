@@ -13,7 +13,6 @@ from textual import on, work  # noqa: E402
 from textual.app import App, ComposeResult  # noqa: E402
 from textual.binding import Binding  # noqa: E402
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll  # noqa: E402
-from textual.markup import escape as _escape  # noqa: E402
 from textual.screen import ModalScreen  # noqa: E402
 from textual.widgets import Button, Input, Label, ListItem, ListView, Static  # noqa: E402
 
@@ -101,7 +100,7 @@ def escape(text):
     style would leak), so it is kept out of escape() and fenced with a zero-width space."""
     core = text.rstrip("\\")
     tail = text[len(core):]
-    return _escape(core) + (tail + "\u200b" if tail else "")
+    return core.replace("[", "\\[") + (tail + "\u200b" if tail else "")  # textual's escape misses "[Remix]"
 
 
 def songs(n):
@@ -249,7 +248,7 @@ class PlaylistPicker(ModalScreen):
 
     def compose(self):
         with Vertical(id="box") as box:
-            box.border_title = f"add {self.what} to…"
+            box.border_title = f"add {escape(self.what)} to…"
             yield ListView(*[PlaylistRow(n, c) for n, c in self.playlists], id="pl")
             yield Input(placeholder="or type a new playlist name + enter", id="name")
 
@@ -830,7 +829,7 @@ class YtmApp(App):
             b.display = (v != "results" or bool(self.results)) and (v != "playlist" or self.view == "playlist")
             b.set_class(v == self.view, "current")
             if v == "playlist" and self.open_playlist:
-                b.label = f"≡ {self.open_playlist}"
+                b.label = f"≡ {escape(self.open_playlist)}"
 
     def render_actions(self):
         """Show only the row buttons that make sense for the current tab."""

@@ -1,0 +1,16 @@
+{
+ "why": "escape() used textual.markup.escape, which only escapes tags starting with a lowercase letter, so a capitalised bracket part ('[Remix]', '[Live]') was eaten as a style tag in every row, title and message.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "Song [Remix]",
+   "artist": "A"
+  }
+ ],
+ "steps": [
+  "queue"
+ ],
+ "expect": [
+  "Song [Remix]  A"
+ ]
+}
