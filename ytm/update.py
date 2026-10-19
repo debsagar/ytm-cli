@@ -33,7 +33,7 @@ def switch(branch):
     # Creates the branch if this clone only has main, fast-forwards it otherwise.
     r = git("fetch", "-q", "origin", f"{branch}:{branch}")
     if r.returncode == 0:
-        r = git("checkout", "-q", branch)
+        r = git("checkout", "-q", branch, "--")  # "--": the repo also has a dev/ folder
     if r.returncode == 0:
         git("branch", "-q", f"--set-upstream-to=origin/{branch}", branch)
     return r
