@@ -19,7 +19,7 @@ from textual.widgets import Button, Input, Label, ListItem, ListView, Static  # 
 
 from . import art, brain, context, library, search, settings, theme  # noqa: E402
 from .player import Player  # noqa: E402
-from .search import Track  # noqa: E402
+from .search import VID_RE, Track  # noqa: E402
 
 # The colours CSS ($ytm-*) and markup use, so they never depend on the terminal theme.
 # Catppuccin Mocha until the first theme; apply_theme then fills it from theme.colors().
@@ -30,7 +30,6 @@ C = dict(
 )
 
 URL_RE = re.compile(r"^(https?://)?((www|music|m)\.)?youtu(be\.com|\.be)/", re.I)
-VID_RE = re.compile(r"(?:v=|youtu\.be/)([\w-]{11})", re.I)  # links may be typed in capitals
 # Noise YouTube adds to titles: "(Official Music Video)", "[Lyrics]", "| Lyrics" ...
 NOISE_RE = re.compile(
     r"\s*([(\[][^)\]]*\b(official|video|lyrics?|letra|audio|visuali[sz]er|oficial|4k|hd)\b[^)\]]*[)\]]|\|\s*lyrics.*)",

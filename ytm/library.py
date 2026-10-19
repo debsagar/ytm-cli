@@ -7,7 +7,7 @@ import threading
 import time
 
 from .player import HOME
-from .search import Track
+from .search import VID_RE, Track
 
 HISTORY = HOME / "mpv" / "history.tsv"
 DB = HOME / "data" / "ytm.db"
@@ -34,9 +34,10 @@ def history(limit=50):
     out, seen = [], set()
     for line in reversed(HISTORY.read_text(encoding="utf-8", errors="replace").splitlines()):
         parts = line.split("\t", 2)
-        if len(parts) != 3 or "v=" not in parts[1]:
+        m = VID_RE.search(parts[1]) if len(parts) == 3 else None
+        if not m:
             continue
-        vid = parts[1].split("v=", 1)[1][:11]
+        vid = m.group(1)
         if vid in seen:
             continue
         seen.add(vid)

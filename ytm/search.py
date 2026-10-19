@@ -1,10 +1,13 @@
 """YouTube Music lookups via ytmusicapi (public data only, no login)."""
 
+import re
 from dataclasses import dataclass
 
 from ytmusicapi import YTMusic
 
 _yt = None
+# The song id in a link: watch?v=ID or youtu.be/ID (history.lua logs whichever mpv was given)
+VID_RE = re.compile(r"(?:v=|youtu\.be/)([\w-]{11})", re.I)  # links may be typed in capitals
 
 
 def _api():
