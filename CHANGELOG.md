@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Versions follow [Semant
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-19
+
 ### Added
 - `ytm update`: move your copy to the latest release; data and settings are untouched.
 - Songs remember their album (new `album` column, added to existing databases on open); Jev sees it for songs judged from now on. The play position is logged as a `quit` event when the app closes.
@@ -78,6 +80,7 @@ All notable changes to this project are documented here. Versions follow [Semant
 - Play history (`ytm history`), logged by an mpv Lua script.
 - Minimal-RAM setup: audio-only mpv with a small cache; PowerShell exits before playback.
 
+[0.5.0]: https://github.com/debsagar/ytm-cli/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/debsagar/ytm-cli/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/debsagar/ytm-cli/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/debsagar/ytm-cli/compare/v0.1.0...v0.2.0
