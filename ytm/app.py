@@ -158,6 +158,44 @@ class PlaylistRow(ListItem):
         self.name_ = name
 
 
+class SafePlayer:
+    """Every control reaches mpv through here, so a failed command is shown, never raised.
+    If mpv has died (or stopped reporting) it is restarted once; the queue is lost."""
+
+    def __init__(self, app):
+        self.app, self.restarted = app, False
+        self.p = Player(on_change=app._from_mpv)
+
+    def __getattr__(self, name):
+        f = getattr(self.p, name)
+        if not callable(f):
+            return f
+
+        def safe(*args):
+            try:
+                return f(*args)
+            except RuntimeError as e:
+                if not self.check():
+                    self.app.say(f"[{C['red']}]{escape(str(e))}[/]")
+        return safe
+
+    def check(self):
+        """True if mpv was found dead (and restarted, or the user was told to restart ytm)."""
+        if getattr(self.p, "alive", lambda: True)():
+            return False
+        if self.restarted:
+            self.app.say(f"[{C['red']}]player stopped: restart ytm[/]")
+            return True
+        self.restarted = True
+        self.app.say(f"[{C['red']}]player stopped, restarting[/]")
+        try:
+            self.p.close()
+            self.p = Player(on_change=self.app._from_mpv)
+        except (RuntimeError, OSError) as e:
+            self.app.say(f"[{C['red']}]player stopped: restart ytm ({escape(str(e))})[/]")
+        return True
+
+
 class HelpScreen(ModalScreen):
     """A popup of text lines: the help, or the settings list."""
     BINDINGS = [Binding("escape,question_mark,q,enter", "dismiss")]
@@ -415,7 +453,7 @@ class YtmApp(App):
         yield Static(id="footer")
 
     def on_mount(self):
-        self.player = Player(on_change=self._from_mpv)
+        self.player = SafePlayer(self)
         self.show("history")
         self.render_now()
         self.render_controls()
@@ -667,6 +705,8 @@ class YtmApp(App):
         if not self.is_running:
             return  # shutting down: the widgets are already being removed
         self._ticks += 1
+        if self._ticks % 8 == 0 and not self.player.restarted:  # mpv died with nobody pressing anything
+            self.player.check()
         if self._ticks % 8 == 0 and self.settings.reload():  # every 2 s: pick up hand edits
             self.say(escape(self.settings.error or self.settings.bad or "⚙ settings reloaded"), True)
             self.render_footer()
