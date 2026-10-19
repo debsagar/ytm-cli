@@ -45,9 +45,11 @@ def _valid(key, v):
             raise ValueError(f"{key}: {SPEC[key][2]}")
         return v
     if isinstance(default, list):  # a subset of the allowed values
-        if not isinstance(v, list) or not all(isinstance(x, str) and x in rule for x in v):
+        if not isinstance(v, list) or not all(isinstance(x, str) and x.lower() in rule for x in v):
             raise ValueError(f"{key}: pick from {', '.join(rule)}")
-        return v
+        return [x.lower() for x in v]
+    if isinstance(v, str):
+        v = v.lower()  # mode = "Off" is fine
     if v not in rule:
         raise ValueError(f"{key}: one of {', '.join(rule)}")
     return v
@@ -56,6 +58,11 @@ def _valid(key, v):
 def _parse(key, text):
     """Turn what the user typed after `set key` into a value of the right type."""
     default = SPEC[key][0]
+    if text[:1] in ("\"", "'", "["):  # the TOML form the popup and the file show: "pinned", ["colours", "motif"]
+        try:
+            return tomllib.loads(f"v = {text}")["v"]
+        except tomllib.TOMLDecodeError:
+            raise ValueError(f"{key}: can't read {text}") from None
     if isinstance(default, list):
         return [x.strip() for x in text.replace(",", " ").split() if x.strip()]
     if isinstance(default, (int, float)):

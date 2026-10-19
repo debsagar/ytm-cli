@@ -800,7 +800,8 @@ class YtmApp(App):
 
     def change_setting(self, cmd, arg):
         """`set` lists settings, `set key value` changes one, `mode x` = `set mode x`."""
-        key, _, value = (f"mode {arg}" if cmd == "mode" else arg).partition(" ")
+        key, _, value = re.sub(r"\s*=\s*", " ", f"mode {arg}" if cmd == "mode" else arg, count=1).partition(" ")
+        key = key.lower()  # also takes `key = value`, as the popup shows it
         if not key or not value:
             lines = []
             for k, (_, _, why) in settings.SPEC.items():
