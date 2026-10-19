@@ -73,7 +73,7 @@ def _closest(key, text):
     if set(words) & set(best.split("_")):
         return best
     for n in range(1, len(words) + 1):  # typos: "stickyness", "budget_dy"
-        if m := difflib.get_close_matches("_".join(words[:n]), SPEC, 1):
+        if len(words[0]) > 2 and (m := difflib.get_close_matches("_".join(words[:n]), SPEC, 1)):  # "me" isn't "mode"
             return m[0]
     return None
 

@@ -1,0 +1,30 @@
+{
+ "name": "song-back-in-black-goes-prev",
+ "why": "'back in black' (AC/DC) and 'next to me' run prev/skip, ignoring the argument, instead of searching.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  },
+  {
+   "id": "ccccccccccc",
+   "title": "Two",
+   "artist": "B"
+  }
+ ],
+ "results": [
+  {
+   "id": "bbbbbbbbbbb",
+   "title": "Back In Black",
+   "artist": "AC/DC"
+  }
+ ],
+ "steps": [
+  "next to me",
+  "back in black"
+ ],
+ "expect": [
+  "Back In Black"
+ ]
+}

@@ -1,0 +1,28 @@
+{
+ "name": "song-save-your-tears-makes-playlist",
+ "why": "'save your tears' (The Weeknd) saves the queue as a playlist called 'your tears' instead of searching. Decided: `save <name>` stays a command (it's documented), and `play <words>` always searches, so the help must say how to search a song that starts with 'save'.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  }
+ ],
+ "results": [
+  {
+   "id": "bbbbbbbbbbb",
+   "title": "Save Your Tears",
+   "artist": "The Weeknd"
+  }
+ ],
+ "steps": [
+  "play save your tears",
+  "?"
+ ],
+ "expect": [
+  "play save… searches"
+ ],
+ "absent": [
+  "≡ saved"
+ ]
+}

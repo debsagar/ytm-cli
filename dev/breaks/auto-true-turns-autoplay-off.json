@@ -1,0 +1,18 @@
+{
+ "name": "auto-true-turns-autoplay-off",
+ "why": "`auto true` / `auto enable` turn autoplay OFF: any argument not in (on, 1, yes) means off.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  }
+ ],
+ "steps": [
+  "auto off",
+  "auto true"
+ ],
+ "expect": [
+  "autoplay on"
+ ]
+}

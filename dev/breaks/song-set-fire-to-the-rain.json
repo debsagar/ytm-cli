@@ -1,0 +1,24 @@
+{
+ "name": "song-set-fire-to-the-rain",
+ "why": "'set fire to the rain' (Adele) is parsed as `set fire ...` and shows 'unknown setting fire' instead of searching.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  }
+ ],
+ "results": [
+  {
+   "id": "bbbbbbbbbbb",
+   "title": "Set Fire to the Rain",
+   "artist": "Adele"
+  }
+ ],
+ "steps": [
+  "set fire to the rain"
+ ],
+ "expect": [
+  "Set Fire to the Rain"
+ ]
+}

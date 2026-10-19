@@ -1,0 +1,27 @@
+{
+ "name": "song-like-a-prayer-likes-current",
+ "why": "'like a prayer' (Madonna) toggles the like on the song that's playing (and unlikes it if it was liked) instead of searching; cmd == 'like' ignores the argument.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  }
+ ],
+ "results": [
+  {
+   "id": "bbbbbbbbbbb",
+   "title": "Like a Prayer",
+   "artist": "Madonna"
+  }
+ ],
+ "steps": [
+  "like a prayer"
+ ],
+ "expect": [
+  "Like a Prayer"
+ ],
+ "absent": [
+  "♥ liked"
+ ]
+}

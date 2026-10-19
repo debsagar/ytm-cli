@@ -1,0 +1,24 @@
+{
+ "name": "song-p-diddy-pauses",
+ "why": "The one-letter aliases eat searches too: 'p diddy' pauses the music and 'n sync ...' skips the song, because 'p'/'n' match whatever follows.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  }
+ ],
+ "results": [
+  {
+   "id": "bbbbbbbbbbb",
+   "title": "I'll Be Missing You",
+   "artist": "Puff Daddy"
+  }
+ ],
+ "steps": [
+  "p diddy"
+ ],
+ "expect": [
+  "Missing You"
+ ]
+}

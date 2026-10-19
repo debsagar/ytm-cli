@@ -46,7 +46,7 @@ HELP_ROWS = [
     ("queue <song>", "add the top result to the queue"),
     ("radio <song>", "start a 50-song mix"),
     ("like", "like / unlike the song that's playing"),
-    ("save <name>", "save the whole queue as a playlist"),
+    ("save <name>", "save the queue · play save… searches"),
     ("skip · prev · pause · vol 40", "playback"),
     ("remove 3 · clear", "edit the queue"),
     ("auto", "autoplay: keep adding similar songs"),
@@ -113,6 +113,19 @@ def songs(n):
 USAGE = {"play": "play <song>", "radio": "radio <song>", "save": "save <playlist name>",
          "vol": "vol <0-100>", "volume": "vol <0-100>", "remove": "remove <number in the queue>",
          "rm": "remove <number in the queue>", "search": "search <song>", "s": "search <song>"}
+ALONE = {"like", "skip", "next", "n", "prev", "back", "pause", "p", "clear", "quit", "exit", "cost", "help", "?"}
+ON, OFF = {"on", "1", "yes", "true", "enable"}, {"off", "0", "no", "false", "disable"}
+
+
+def is_command(cmd, arg):
+    """Whether `cmd arg` is a command, or a search that starts with a command word ("quit playing games")."""
+    if cmd in ALONE:
+        return not arg
+    if cmd in ("auto", "autoplay"):
+        return not arg or arg.lower() in ON | OFF
+    if cmd == "set":  # "set max themes 20" is a (mistyped) setting, "set fire to the rain" a song
+        return not arg or settings._closest(re.split(r"[\s=]", arg)[0], "") is not None
+    return True
 
 
 def keys(*pairs):
@@ -970,6 +983,8 @@ class YtmApp(App):
             return
         cmd, _, arg = line.partition(" ")
         cmd, arg = cmd.lower(), arg.strip()
+        if not is_command(cmd, arg):
+            cmd, arg = "search", line
         p = self.player
         try:
             if cmd in ("play", "queue", "q+", "radio", "search", "s") and arg:
@@ -984,7 +999,7 @@ class YtmApp(App):
             elif cmd in USAGE and not arg:
                 self.say(f"usage: {USAGE[cmd]}")
             elif cmd in ("auto", "autoplay"):
-                self.toggle_auto(None if not arg else arg.lower() in ("on", "1", "yes"))
+                self.toggle_auto(None if not arg else arg.lower() in ON)
             elif cmd == "like":
                 t = self.current_track()
                 self.like(t) if t else self.say("nothing playing")
