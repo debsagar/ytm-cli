@@ -1,0 +1,17 @@
+{
+ "why": "⏭ on the last song (autoplay off) sent playlist-next force, so mpv went idle for good while ⏯ still showed ⏸; ⏮ on the first did the same. Now ⏭ there does nothing and says so, and ⏮ restarts the song (real mpv: checked with hunt2 app_probe.py prev-first).",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  }
+ ],
+ "steps": [
+  "auto off",
+  "skip"
+ ],
+ "expect": [
+  "end of queue"
+ ]
+}

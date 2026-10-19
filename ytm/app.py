@@ -1023,7 +1023,7 @@ class YtmApp(App):
                 n = self.lib.add_to_playlist(arg, [tidy(t) for t in tracks])
                 self.say(f"≡ saved {songs(n)} to {escape(arg)}")
             elif cmd in ("skip", "next", "n"):
-                p.next()
+                self.action_next()
             elif cmd in ("prev", "back"):
                 p.prev()
             elif cmd in ("pause", "p"):
@@ -1075,7 +1075,7 @@ class YtmApp(App):
         elif bid == "pause":
             p.toggle_pause()
         elif bid == "next":
-            p.next()
+            self.action_next()
         elif bid == "voldown":
             p.set_volume((self.state["volume"] or 0) - 10)
         elif bid == "volup":
@@ -1163,7 +1163,8 @@ class YtmApp(App):
         self.player.toggle_pause()
 
     def action_next(self):
-        self.player.next()
+        if self.player.next() is False:
+            self.say("end of queue")
 
     def action_prev(self):
         self.player.prev()

@@ -176,10 +176,19 @@ class Player:
         self.command("loadfile", url, "append-play")
 
     def next(self):
+        """Returns False on the last song: mpv would stop and go idle with nothing to play."""
+        pos, count = self.get("playlist-pos"), self.get("playlist-count") or 0
+        if pos is not None and pos + 1 >= count:
+            return False
         self.command("playlist-next", "force")
+        return True
 
     def prev(self):
-        self.command("playlist-prev", "force")
+        pos = self.get("playlist-pos")
+        if pos == 0:  # the first song restarts (playlist-prev would leave mpv idle)
+            self.command("seek", 0, "absolute")
+        elif pos is not None and pos > 0:  # idle (-1): nothing playing to go back from
+            self.command("playlist-prev", "force")
 
     def toggle_pause(self):
         self.command("cycle", "pause")

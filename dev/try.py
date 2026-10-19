@@ -78,8 +78,10 @@ class FakePlayer:
         self._emit(playlist_count=len(self.items))
 
     def next(self):
-        if self.pos + 1 < len(self.items):
-            self._go(self.pos + 1)
+        if self.pos + 1 >= len(self.items):
+            return False
+        self._go(self.pos + 1)
+        return True
 
     def prev(self):
         if self.pos > 0:
