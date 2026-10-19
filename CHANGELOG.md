@@ -13,6 +13,9 @@ All notable changes to this project are documented here. Versions follow [Semant
 - The help popup scrolls when the window is short.
 - Cost tracking: every Jev and LLM call is logged with its tokens and price. The footer shows today's spend, and `cost` breaks it down by today, this month and all time.
 
+### Changed
+- README screenshots now show per-song themes, the four layouts and the settings popup.
+
 ## [0.4.0] - 2026-10-19
 
 ### Added

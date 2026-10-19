@@ -66,6 +66,12 @@ ytm finds mpv in `C:\Program Files\MPV Player`, a `bin` folder inside the repo, 
 
 Each song gets a theme: colours, a scrolling motif, a progress-bar style and one of four layouts: **classic** (album art and the song list), **hero** (big art and a spaced-out title), **stage** (an animated equaliser next to the art) or **focus** (just the song, centred). There are 13 built-in themes, such as *neon rave*, *rainy window* and *pit wall*.
 
+| hero | stage |
+|---|---|
+| ![hero layout](docs/layout-hero.png) | ![stage layout](docs/layout-stage.png) |
+| **classic** | **focus** |
+| ![classic layout](docs/layout-classic.png) | ![focus layout](docs/layout-focus.png) |
+
 - **◐ theme** cycles through every theme.
 - **vibe** switches between calm (focus layout, no decoration), normal and loud (stage layout).
 
@@ -91,6 +97,8 @@ Every paid call is logged with its tokens and price. The footer shows what the b
 ### Settings
 
 Type `set` to see every setting and `set <key> <value>` to change one (`mode off` is a shortcut for `set mode off`). They are saved in `%USERPROFILE%\.config\ytm\settings.toml`, which you can also edit by hand while ytm runs.
+
+![the settings popup](docs/settings.png)
 
 | Setting | Default | What it does |
 |---|---|---|
