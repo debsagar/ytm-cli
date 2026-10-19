@@ -4,7 +4,7 @@ A minimal-RAM YouTube Music player for the Windows terminal. Search, queue, star
 
 Under the hood it is a single audio-only [mpv](https://mpv.io) process fed by [yt-dlp](https://github.com/yt-dlp/yt-dlp), controlled by a small [Textual](https://textual.textualize.io) app. Together they use about 120 MB of RAM.
 
-![ytm mini-player](docs/screenshot.png)
+![ytm mini-player](docs/player.png)
 
 ## Requirements
 
