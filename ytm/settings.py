@@ -124,10 +124,6 @@ class Settings:
         self.path.write_text("\n".join(lines), encoding="utf-8")
         self._mtime = self.path.stat().st_mtime
 
-    def rows(self):
-        """(key = value, explanation) pairs for the settings popup."""
-        return [(f"{k} = {_toml(self.values[k])}", SPEC[k][2]) for k in SPEC]
-
 
 def allowance(s, day, month):
     """What the brain may do right now: (jev allowed, llm allowed, reason when not).

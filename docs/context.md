@@ -45,7 +45,7 @@ timing; they get moods once Jev measures them.
 ## Slices
 
 - **jev**: the song only, `{title, artist}`, exactly what is sent today. **Measurement stays user-independent.** Features feed clustering, and the theme centres are learned from every song. If taste leaked in, the same song would measure differently as you change, cached vectors would go stale, and Jev, which can only score the options it is given, would drift towards moods you already like, so the clusters would collapse into your average. The user comes in *after* measurement, in code (nearest theme, ranking). Weak results on small artists are better fixed with song-side facts such as the album (see open questions).
-- **theme**: taste without themes, contexts reduced to energy, moods and tags, looks left or chosen, vibe, and `these_songs` (which playlists the new cluster's songs are in, how often and when you play them, early skips). It replaces `lib.profile()` in `brain.grow`.
+- **theme**: taste without themes, contexts reduced to energy, moods and tags, looks left or chosen, vibe, and `these_songs` (which playlists the new cluster's songs are in, how often and when you play them, early skips). `brain.grow` sends it with the new cluster's songs.
 - **widget**: short taste, the latest session, `now` (daypart and what you usually play then), and the song playing with how you treat it.
 - **profile**: the whole state, trimmed. A daily Haiku rewrite would turn it into a short note of a few lines, stored as data and quoted by the other slices.
 

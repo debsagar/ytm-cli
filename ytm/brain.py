@@ -20,7 +20,6 @@ from . import context, settings, theme
 SECRETS = Path.home() / ".config" / "ytm" / "secrets.env"
 JEV_URL = "https://api.typesafe.ai/v1/systemone"
 LLM_URL = "https://openrouter.ai/api/v1/chat/completions"
-LLM_MODEL = "anthropic/claude-haiku-5.5"  # default of the llm_model setting
 
 # Tuned on 84 real songs after refine(): distance median 0.51, p90 0.70.
 OUTLIER = 0.6       # distance beyond which a song doesn't belong to any theme
