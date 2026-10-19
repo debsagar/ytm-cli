@@ -5,6 +5,7 @@ All notable changes to this project are documented here. Versions follow [Semant
 ## [Unreleased]
 
 ### Added
+- `ytm update`: move your copy to the latest release; data and settings are untouched.
 - Songs remember their album (new `album` column, added to existing databases on open); Jev sees it for songs judged from now on. The play position is logged as a `quit` event when the app closes.
 - GitHub Actions CI (compile, ruff, break scenarios), CONTRIBUTING.md and issue/PR templates.
 - Settings in `%USERPROFILE%\.config\ytm\settings.toml`, picked up live when the file changes; `set` lists them, `set <key> <value>` changes one.
