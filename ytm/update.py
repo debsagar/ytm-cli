@@ -1,8 +1,8 @@
 """ytm update: move this copy of the code to the latest release.
 
-A pinned copy (detached, like the ytm-stable worktree) jumps to origin/main; a
-normal clone on a branch is fast-forwarded. Library, history and settings live
-outside the code, so they are never touched. Local edits make git refuse."""
+A pinned copy (a detached HEAD) jumps to origin/main; a normal clone on a branch is
+fast-forwarded. Library and history (git-ignored, or in the ytm.home folder) and
+settings (~/.config/ytm) are never touched. Local edits make git refuse."""
 
 import re
 import subprocess

@@ -21,7 +21,8 @@ from . import art, brain, context, library, search, settings, theme  # noqa: E40
 from .player import Player  # noqa: E402
 from .search import Track  # noqa: E402
 
-# Catppuccin Mocha palette, used directly so colours never depend on the terminal theme.
+# The colours CSS ($ytm-*) and markup use, so they never depend on the terminal theme.
+# Catppuccin Mocha until the first theme; apply_theme then fills it from theme.colors().
 C = dict(
     crust="#11111b", mantle="#181825", base="#1e1e2e", s0="#313244", s1="#45475a",
     dim="#6c7086", sub="#a6adc8", text="#cdd6f4",
@@ -110,7 +111,7 @@ def songs(n):
 
 # commands that need an argument; bare, they show this instead of searching YouTube for the word
 USAGE = {"play": "play <song>", "radio": "radio <song>", "save": "save <playlist name>",
-         "vol": "vol <0-130>", "volume": "vol <0-130>", "remove": "remove <number in the queue>",
+         "vol": "vol <0-100>", "volume": "vol <0-100>", "remove": "remove <number in the queue>",
          "rm": "remove <number in the queue>", "search": "search <song>", "s": "search <song>"}
 
 
@@ -645,7 +646,7 @@ class YtmApp(App):
         self.think(vid, nxt.group(1) if nxt else None)
 
     def tick(self):
-        """4x a second: scroll the motif, move the equaliser, keep art visibility right."""
+        """4x a second: re-read settings (every 2 s), re-fit the layout, scroll the motif, move the equalisers."""
         if not self.is_running:
             return  # shutting down: the widgets are already being removed
         self._ticks += 1

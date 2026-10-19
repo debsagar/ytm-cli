@@ -102,7 +102,7 @@ class FakePlayer:
         self._emit(pause=not self.app.state["pause"])
 
     def set_volume(self, v):
-        self._emit(volume=max(0, min(130, v)))
+        self._emit(volume=max(0, min(100, v)))
 
     def seek(self, s):
         self._emit(time_pos=(self.app.state["time-pos"] or 0) + s)
