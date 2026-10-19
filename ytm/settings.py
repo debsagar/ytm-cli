@@ -106,11 +106,10 @@ class Settings:
         if mtime == self._mtime:
             return False
         self._mtime = mtime
-        data = {}
+        data, self.error = {}, None  # a deleted file is no error
         if mtime is not None:
             try:
                 data = tomllib.loads(self.path.read_text(encoding="utf-8-sig"))  # Notepad adds a BOM
-                self.error = None
             except (tomllib.TOMLDecodeError, UnicodeDecodeError) as e:
                 self.error = f"settings.toml: {e}"  # keep the last good values
                 return True
@@ -126,6 +125,8 @@ class Settings:
         if key not in SPEC:
             near = _closest(key, text)
             raise ValueError(f"unknown setting {key}: " + (f"did you mean {near}?" if near else "type `set` to see them all"))
+        if self.error:  # saving now would rewrite the file from defaults and erase the user's edits
+            raise ValueError(f"fix settings.toml first: {self.error.removeprefix('settings.toml: ')}")
         self.values[key] = _valid(key, _parse(key, text.strip()))
         self.save()
         return self.values[key]
