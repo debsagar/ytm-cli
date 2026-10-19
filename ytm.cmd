@@ -14,7 +14,6 @@ if /i "%~1"=="import" (
     popd
     exit /b
 )
-if /i "%~1"=="proto" goto proto
 if not "%~1"=="" goto classic
 where wt >nul 2>nul || goto app
 rem wt treats ";" as a command separator, so escape it in the folder path
@@ -22,19 +21,6 @@ set "YTM_DIR=%~dp0."
 set "YTM_DIR=%YTM_DIR:;=\;%"
 start "" wt -w new --size 74,24 --title ytm -d "%YTM_DIR%" "%YTM_PY%" -m ytm
 exit /b 0
-
-:proto
-rem dev only: the widget dashboard prototype (dev\proto.py) in a bigger window
-where wt >nul 2>nul || goto proto_here
-set "YTM_DIR=%~dp0."
-set "YTM_DIR=%YTM_DIR:;=\;%"
-start "" wt -w new --size 120,34 --title "ytm proto" -d "%YTM_DIR%" "%YTM_PY%" dev\proto.py
-exit /b 0
-:proto_here
-pushd "%~dp0"
-"%YTM_PY%" dev\proto.py
-popd
-exit /b
 
 :app
 pushd "%~dp0"
