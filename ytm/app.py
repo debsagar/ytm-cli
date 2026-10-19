@@ -111,7 +111,7 @@ def songs(n):
 
 # commands that need an argument; bare, they show this instead of searching YouTube for the word
 USAGE = {"play": "play <song>", "radio": "radio <song>", "save": "save <playlist name>",
-         "vol": "vol <0-100>", "volume": "vol <0-100>", "remove": "remove <number in the queue>",
+         "vol": "vol <0-100> · vol +10 · vol -10", "volume": "vol <0-100> · vol +10 · vol -10", "remove": "remove <number in the queue>",
          "rm": "remove <number in the queue>", "search": "search <song>", "s": "search <song>"}
 ALONE = {"like", "skip", "next", "n", "prev", "back", "pause", "p", "clear", "quit", "exit", "cost", "help", "?"}
 ON, OFF = {"on", "1", "yes", "true", "enable"}, {"off", "0", "no", "false", "disable"}
@@ -1024,7 +1024,7 @@ class YtmApp(App):
             elif cmd in ("pause", "p"):
                 p.toggle_pause()
             elif cmd in ("vol", "volume"):
-                p.set_volume(int(arg))
+                p.set_volume(int(arg) + ((self.state["volume"] or 0) if arg[:1] in ("+", "-") else 0))  # vol +10 is louder
             elif cmd in ("remove", "rm"):
                 n = int(arg)
                 if n < 1:
