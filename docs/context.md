@@ -1,7 +1,7 @@
 # Context: what ytm knows about you
 
 One builder, `ytm/context.py`, turns raw data into small slices, one per consumer. No model ever sees raw history.
-`python -m ytm.context [state|jev|theme|widget|profile] [video id]` prints exactly what each one would get, with its size.
+`uv run python -m ytm.context [state|jev|theme|widget|profile] [video id]` prints exactly what each one would get, with its size.
 
 ```
  sources (raw, append-only)           state (code, ~2-40 KB)           slices (capped)         consumers

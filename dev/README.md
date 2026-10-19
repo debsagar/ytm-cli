@@ -3,8 +3,8 @@
 There are no hand-written test lists here. Each round, someone (usually an LLM agent) reads the code and writes the scenarios **most likely to break it**, the counterexamples. Only scenarios that actually broke something are kept, in `breaks/`.
 
 ```powershell
-python dev/try.py dev/breaks/*.json            # replay every known break
-python dev/try.py my_idea.json --svg           # try a new idea; screens go to %TEMP%\ytm-try
+uv run python dev/try.py dev/breaks/*.json     # replay every known break
+uv run python dev/try.py my_idea.json --svg    # try a new idea; screens go to %TEMP%\ytm-try
 ```
 
 `try.py` renders the real UI with a fake player: no mpv, no network and no API spend. The scenario format is described at the top of the file.
