@@ -444,6 +444,8 @@ class YtmApp(App):
                 self.run_worker(lambda: brain.measure_next(self.lib, self.settings) is False
                                 and self.call_from_thread(timer.stop), thread=True, group="backlog", exit_on_error=False)
         timer = self.set_interval(30, backlog)
+        if self.settings.error or self.settings.bad:  # a broken file at launch: say so, or it's silently defaults
+            self.say(escape(self.settings.error or self.settings.bad))
 
     def on_unmount(self):
         try:  # position at quit, for resume; must never block quitting
@@ -666,7 +668,7 @@ class YtmApp(App):
             return  # shutting down: the widgets are already being removed
         self._ticks += 1
         if self._ticks % 8 == 0 and self.settings.reload():  # every 2 s: pick up hand edits
-            self.say(escape(self.settings.error) if self.settings.error else "⚙ settings reloaded", True)
+            self.say(escape(self.settings.error or self.settings.bad or "⚙ settings reloaded"), True)
             self.render_footer()
         self.apply_layout()  # also on resize, but the new size can arrive a moment later
         if self.query_one("#info").content_size.width != self._bar_width:

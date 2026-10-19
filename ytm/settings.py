@@ -90,7 +90,8 @@ class Settings:
     def __init__(self, path=PATH):
         self.path = path
         self.values = {k: s[0] for k, s in SPEC.items()}
-        self.error = None
+        self.error = None  # a syntax error: the whole file is ignored
+        self.bad = None    # values that were rejected (the other keys still apply)
         self._mtime = None
         self.reload()
 
@@ -98,7 +99,7 @@ class Settings:
         return self.values[key]
 
     def reload(self):
-        """Re-read the file if it changed. Returns True if it did (check .error)."""
+        """Re-read the file if it changed. Returns True if it did (check .error and .bad)."""
         try:
             mtime = self.path.stat().st_mtime
         except FileNotFoundError:
@@ -113,11 +114,14 @@ class Settings:
             except (tomllib.TOMLDecodeError, UnicodeDecodeError) as e:
                 self.error = f"settings.toml: {e}"  # keep the last good values
                 return True
+        bad = []
         for key, (default, _, _) in SPEC.items():
             try:
                 self.values[key] = _valid(key, data[key]) if key in data else default
-            except ValueError:
+            except ValueError as e:
                 self.values[key] = default
+                bad.append(f"{e}, using {_toml(default)}")
+        self.bad = "settings.toml: " + " · ".join(bad) if bad else None
         return True
 
     def set(self, key, text):
