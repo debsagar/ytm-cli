@@ -181,7 +181,6 @@ class YtmApp(App):
     #motif {{ color: $ytm-mauve; height: 1; }}
     #eq {{ color: $ytm-mauve; height: 3; display: none; }}
     Screen.layout-stage #eq {{ display: block; }}
-    Screen.layout-stage #art {{ display: none; }}
     Screen.layout-hero #art {{ width: {ART_W * 2}; height: {ART_H * 2}; margin-right: 3; }}
     Screen.layout-hero #title {{ margin-top: 1; }}
     Screen.layout-hero #list {{ max-height: 12; }}
@@ -434,7 +433,7 @@ class YtmApp(App):
             energy = self.song_feats.get("energy", 0.5)
             self.query_one("#eq").update(theme.equaliser(width, 3, self._phase, energy))
         roomy = self.size.width >= 70 and self.size.height >= 26
-        self.query_one("#art").styles.display = "block" if roomy and self.layout in ("classic", "hero") else "none"
+        self.query_one("#art").styles.display = "block" if roomy and self.layout != "focus" else "none"
 
     # ---- the song that's playing ----
     def current_id(self):
