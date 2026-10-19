@@ -762,7 +762,9 @@ class YtmApp(App):
 
     def update_art(self):
         vid = self.current_id()
-        if vid and vid != self._art_id:
+        if not vid:
+            self._art_id = None  # queue ended: playing the same song again is a new song (song_changed)
+        elif vid != self._art_id:
             self._art_id = vid
             self.load_art(vid)
 
