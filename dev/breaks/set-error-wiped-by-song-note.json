@@ -1,0 +1,26 @@
+{
+ "name": "set-error-wiped-by-song-note",
+ "why": "A `set` error lives only in #msg; the next song's theme note (show_song_theme -> say) replaces it within a second, and the classic layout has no message log, so the user never sees that the setting wasn't saved.",
+ "songs": [
+  {
+   "id": "aaaaaaaaaaa",
+   "title": "One",
+   "artist": "A"
+  },
+  {
+   "id": "ccccccccccc",
+   "title": "Two",
+   "artist": "B"
+  }
+ ],
+ "steps": [
+  "set max themes 20",
+  {
+   "key": "ctrl+n",
+   "wait": 1
+  }
+ ],
+ "expect": [
+  "unknown setting"
+ ]
+}

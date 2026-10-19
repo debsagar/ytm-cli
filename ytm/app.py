@@ -359,6 +359,7 @@ class YtmApp(App):
         self._played = None        # (video id, last position, duration) for skip logging
         self.layout = "classic"     # the layout on screen (the theme's, if the window fits it)
         self._log = []              # recent messages, shown in the dashboard's ask panel
+        self._said = -math.inf      # when the user last got a reply (automatic notes wait 5 s after it)
         self._phase = 0.0           # animation clock, advances only while playing
         self._bar_width = None      # #info width the bar was last drawn for
 
@@ -434,7 +435,7 @@ class YtmApp(App):
                 self.player.command("set_property", "pause", True)
                 self.player.command("loadfile", t.url, "replace", -1, f"start={r['at']}")  # mpv ≥ 0.38
                 note = f"resume · {escape(s['title'])} at {theme.fmt(r['at'])} · press ⏯"
-                self.set_timer(2, lambda: self.say(note))  # shortcut: after the song's theme note, not ordered
+                self.set_timer(2, lambda: self.say(note, True))  # shortcut: after the song's theme note, not ordered
             except RuntimeError:
                 pass
 
@@ -593,14 +594,14 @@ class YtmApp(App):
             if not jev and not self.lib.features(vid):
                 return
             if not self.lib.features(vid):
-                self.call_from_thread(self.say, "✦ reading the song …")
+                self.call_from_thread(self.say, "✦ reading the song …", True)
             feats = brain.with_look(self.lib, vid, brain.think(self.song_dict(vid), self.lib, llm))
             if vid == self.current_id():
                 self.call_from_thread(self.show_song_theme, feats)
             if jev and next_vid and not self.lib.features(next_vid):
                 brain.think(self.song_dict(next_vid), self.lib, llm)  # ready before the song starts
         except Exception as e:  # network/API trouble: keep the current look
-            self.call_from_thread(self.say, f"brain offline: {escape(str(e))[:60]}")
+            self.call_from_thread(self.say, f"brain offline: {escape(str(e))[:60]}", True)
         finally:
             self.call_from_thread(self.render_footer)  # new spend shows up right away
 
@@ -613,7 +614,7 @@ class YtmApp(App):
             note += f" · kept {self.theme_spec['name']} ({kept})"
         else:
             self.restyle(self.theme_named(feats["theme"]))
-        self.say((f"✦ new theme grown from {brain.MIN_CLUSTER}+ similar songs · " if feats.get("new_theme") else "") + escape(note))
+        self.say((f"✦ new theme grown from {brain.MIN_CLUSTER}+ similar songs · " if feats.get("new_theme") else "") + escape(note), True)
 
     def keep_look(self, feats):
         """Why the current look stays (the restyle schedule, or stickiness), or None to switch."""
@@ -665,7 +666,7 @@ class YtmApp(App):
             return  # shutting down: the widgets are already being removed
         self._ticks += 1
         if self._ticks % 8 == 0 and self.settings.reload():  # every 2 s: pick up hand edits
-            self.say(escape(self.settings.error) if self.settings.error else "⚙ settings reloaded")
+            self.say(escape(self.settings.error) if self.settings.error else "⚙ settings reloaded", True)
             self.render_footer()
         self.apply_layout()  # also on resize, but the new size can arrive a moment later
         if self.query_one("#info").content_size.width != self._bar_width:
@@ -860,7 +861,14 @@ class YtmApp(App):
         self.view = view
         self.fill_list()
 
-    def say(self, text):
+    def say(self, text, auto=False):
+        """Show a message. auto: a note nobody asked for, held back until the last reply is 5 s old."""
+        wait = self._said + 5 - time.monotonic()
+        if auto and wait > 0:
+            self.set_timer(wait, lambda: self.say(text, True))
+            return
+        if not auto:
+            self._said = time.monotonic()
         self.query_one("#msg").update(text)
         if text and text not in self._log[-1:]:
             self._log = (self._log + [text])[-20:]
@@ -907,9 +915,9 @@ class YtmApp(App):
             new = context.rerank(self.lib, [t for t in search.radio(seed, limit=30) if t.video_id not in existing])[:10]
             if new:
                 self.call_from_thread(self.play_tracks, new, False)
-                self.call_from_thread(self.say, f"autoplay · added {len(new)} similar {'song' if len(new) == 1 else 'songs'}")
+                self.call_from_thread(self.say, f"autoplay · added {len(new)} similar {'song' if len(new) == 1 else 'songs'}", True)
         except Exception as e:
-            self.call_from_thread(self.say, f"autoplay failed: {escape(str(e))}")
+            self.call_from_thread(self.say, f"autoplay failed: {escape(str(e))}", True)
         finally:
             self.call_from_thread(setattr, self, "_filling", False)
 
