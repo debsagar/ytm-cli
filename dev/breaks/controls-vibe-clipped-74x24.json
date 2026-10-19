@@ -1,5 +1,5 @@
 {
- "why": "At the real 74x24 window the controls row is wider than #info, so the last button shows as a lone 'v' instead of 'vibe'. (Fixed by icon labels; vibe shows its current mood.)",
+ "why": "At the real 74x24 window the controls row is wider than #info, so the last button shows as a lone 'v' instead of 'vibe'. (Fixed by icon labels; vibe shows its current mood.) (The vibe button became the ▦ layout button: the last button in the row is now ▦.)",
  "theme": "default",
  "songs": [
   {
@@ -9,6 +9,6 @@
   }
  ],
  "expect": [
-  "normal"
+  "▦"
  ]
 }

@@ -21,9 +21,14 @@ All notable changes to this project are documented here. Versions follow [Semant
   - the look you settle on after cycling themes is used again for that song and very similar ones;
   - launch resumes a song you left mid-way, paused at its position (press ⏯), and starts in the vibe you usually pick at that time of day;
   - songs known only from history are measured by Jev in the background, one every 30 s while playing, within the budget.
+- **dashboard** layout: player and ask (with a short log of recent messages) on top, library and an animated visualizer below. It needs a 100x30 window; smaller windows show classic until there is room.
+- ▦ button and `layout` command: `layout` cycles to the next layout (skipping the dashboard when the window is too small), `layout <name>` jumps to one. Logged as an event; a chosen layout stays across songs unless `can_change` includes `layout`.
 - Cost tracking: every Jev and LLM call is logged with its tokens and price. The footer shows today's spend, and `cost` breaks it down by today, this month and all time.
 
 ### Changed
+- The UI is split into bordered panels (now playing, library, ask), each with its own accent from the song's theme; the focused panel's border lights up. Panels lose their gaps when the window is under 28 rows, so everything still fits 74x24.
+- The vibe button is gone (▦ took its place); `vibe` cycles calm, normal, loud and `vibe <name>` sets one.
+- Hero shows its big 40x20 art from 40 rows up (was 36) so the list keeps a few rows.
 - README screenshots now show per-song themes, the four layouts and the settings popup.
 
 ## [0.4.0] - 2026-10-19
