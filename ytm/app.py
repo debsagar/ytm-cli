@@ -65,7 +65,13 @@ HELP_ROWS = [
     ("Enter", "play selected song / open playlist"),
     ("a · l · s · d", "queue · like · playlist · remove"),
     ("← →", "switch list tabs"),
+    ("", ""),
     ("Ctrl+Space · Ctrl+N · Ctrl+B", "pause · next · previous"),
+    ("Ctrl+← → · Ctrl+↑ ↓", "seek 10 s · volume"),
+    ("Ctrl+L · Ctrl+R", "like the song · autoplay on/off"),
+    ("Ctrl+T · Ctrl+G", "theme picker · layout picker"),
+    ("F2 (or Ctrl+P)", "mini player: pop in, pop back out"),
+    ("F1 · ?", "this help"),
 ]
 
 
@@ -134,8 +140,8 @@ def is_command(cmd, arg):
 
 
 def keys(*pairs):
-    """Footer hint: coloured key, grey description."""
-    return "   ".join(f"[b {C['blue']}]{k}[/] [{C['dim']}]{d}[/]" for k, d in pairs)
+    """Footer hint: quiet key, dimmer description."""
+    return "   ".join(f"[b {C['sub']}]{k}[/] [{C['dim']}]{d}[/]" for k, d in pairs)
 
 
 class Btn(Button, can_focus=False):
@@ -337,25 +343,24 @@ class YtmApp(App):
     CSS = f"""
     Screen {{ background: $ytm-base; color: $ytm-text; }}
 
-    /* Panels: thin rounded boxes, subtle until focused; each has its own accent. */
+    /* Panels: one quiet border and title tone; only the focused panel takes the accent. */
     /* Gaps go on fixed-height boxes only (a margin on a 1fr box overflows its parent),
        and always as whole margins: a lone margin-bottom resets the other sides. */
     #body {{ height: 1fr; padding: 1 0 0 0; }}
     #left {{ height: 1fr; }}
     #right {{ height: auto; margin: 1 0 0 0; }}
     .panel {{ height: auto; margin: 0 1; padding: 0 1; background: $ytm-base;
-              border: round $ytm-s1; border-title-style: bold; border-title-align: left; }}
-    #player {{ margin: 0 1 1 1; border: round $ytm-mauve 45%; border-title-color: $ytm-mauve; }}
+              border: round $ytm-s1; border-title-style: bold; border-title-align: left; border-title-color: $ytm-dim; }}
+    .panel:focus-within {{ border: round $ytm-mauve; border-title-color: $ytm-mauve; }}
+    #player {{ margin: 0 1 1 1; }}
     Screen.tight #body, Screen.tight #right {{ padding: 0; margin: 0; }}
     Screen.tight #player {{ margin: 0 1; }}
-    #library {{ height: 1fr; border-title-color: $ytm-green; }}
-    #library:focus-within {{ border: round $ytm-green; }}
-    #ask {{ border-title-color: $ytm-blue; }}
-    #ask:focus-within {{ border: round $ytm-blue; }}
-    #viz {{ display: none; height: {PANEL_H["viz"]}; border-title-color: $ytm-mauve; }}  /* fit_panels shows it */
+    #library {{ height: 1fr; }}
+    #viz {{ display: none; height: {PANEL_H["viz"]}; }}  /* fit_panels shows it */
     #log {{ display: none; color: $ytm-dim; content-align: left bottom; text-wrap: nowrap; text-overflow: ellipsis; }}
 
     #now {{ height: auto; }}
+    Screen.art #info {{ height: 100%; align-vertical: middle; }}  /* the song sits centred beside the art, not stuck to its top */
     #art {{ width: {ART_W}; height: {ART_H}; margin-right: 2; color: $ytm-s1; }}
     #info {{ height: auto; }}
     #title {{ color: $ytm-pink; text-style: bold; }}
@@ -368,6 +373,7 @@ class YtmApp(App):
     Screen.layout-focus #player {{ height: 1fr; margin: 0 1; }}
     Screen.layout-focus #now {{ height: 1fr; align: center middle; }}
     Screen.layout-focus #info {{ width: 80%; }}
+    Screen.layout-focus #controls {{ align: center top; }}
 
     /* dashboard: player | ask on top, library | visualizer below */
     Screen.layout-dashboard #body {{ layout: horizontal; }}
@@ -378,15 +384,12 @@ class YtmApp(App):
     Screen.layout-dashboard #library {{ margin: 0 0 0 1; }}
     Screen.layout-dashboard #ask {{ margin: 0 1 1 1; }}
     Screen.layout-dashboard #now, Screen.layout-dashboard #info {{ height: 1fr; }}
-    Screen.layout-dashboard #controls {{ dock: bottom; }}
-    Screen.layout-dashboard #ask {{ border-title-color: $ytm-pink; }}
-    Screen.layout-dashboard #ask:focus-within {{ border: round $ytm-pink; }}
     Screen.layout-dashboard #viz {{ height: 1fr; }}
     Screen.layout-dashboard #log {{ display: block; height: 1fr; }}
     Screen.layout-dashboard #msg {{ height: auto; text-wrap: wrap; }}  /* the ask panel is narrow: wrap, the log above shrinks */
     Screen.layout-dashboard #motif {{ display: none; }}
     Screen.layout-dashboard #controls {{ layout: vertical; height: 2; }}
-    #viz_eq {{ height: 1fr; color: $ytm-mauve; }}
+    #viz_eq {{ height: 1fr; color: $ytm-mauve 40%; }}  /* light: decoration, not the main thing */
     #viz_cap {{ height: 1; color: $ytm-dim; text-wrap: nowrap; text-overflow: ellipsis; }}
     Screen.layout-focus #title {{ text-align: center; }}
     Screen.layout-focus #artist, Screen.layout-focus #headline, Screen.layout-focus #motif {{ text-align: center; }}
@@ -423,6 +426,8 @@ class YtmApp(App):
     #list {{ height: 1fr; background: $ytm-base;
              scrollbar-size-vertical: 1; scrollbar-color: $ytm-s1; scrollbar-background: $ytm-base; }}
     #list > ListItem {{ background: $ytm-base; }}
+    #list > ListItem.empty, #list:focus > ListItem.empty {{ height: 3; content-align: center middle; background: $ytm-base; }}
+    #list > ListItem.empty Label {{ width: 1fr; text-align: center; }}
     #list > ListItem.-highlight {{ background: $ytm-mantle; }}
     #list:focus > ListItem.-highlight {{ background: $ytm-s0; }}
     #list:focus {{ background-tint: $ytm-base 0%; }}  /* the panel border shows focus */
@@ -433,6 +438,13 @@ class YtmApp(App):
     #prompt > .input--cursor {{ background: $ytm-mauve; color: $ytm-crust; }}
     #footer {{ height: 1; padding: 0 2; margin: 1 0 0 0; background: $ytm-crust; }}
     Screen.tight #footer {{ margin: 0; }}
+
+    /* mini: one song line and a thin bar, above the prompt (F2, or automatic on a tiny window) */
+    #mini {{ display: none; height: 2; padding: 0 2; margin: 1 0 0 0; }}
+    Screen.mini #mini {{ display: block; }}
+    Screen.tight #mini {{ margin: 0; }}
+    Screen.mini-only #left, Screen.mini-only #footer {{ display: none; }}
+    Screen.mini-only #body {{ height: auto; }}
     """
     BINDINGS = [
         Binding("ctrl+space,ctrl+@", "pause", priority=True),  # Windows Terminal sends Ctrl+Space as NUL: ctrl+@
@@ -440,6 +452,14 @@ class YtmApp(App):
         Binding("ctrl+b", "prev", priority=True),
         Binding("ctrl+right", "seek(10)", priority=True),
         Binding("ctrl+left", "seek(-10)", priority=True),
+        Binding("ctrl+up", "volume(10)", priority=True),
+        Binding("ctrl+down", "volume(-10)", priority=True),
+        Binding("ctrl+l", "like", priority=True),
+        Binding("ctrl+r", "auto", priority=True),
+        Binding("ctrl+t", "themes", priority=True),
+        Binding("ctrl+g", "layouts", priority=True),  # g for grid, like ▦
+        Binding("f2,ctrl+p", "mini", priority=True),  # Fn+F2 is awkward on laptops: Ctrl+P too
+        Binding("f1", "help", priority=True),
         Binding("escape", "focus_prompt"),
         Binding("left", "tab(-1)"),
         Binding("right", "tab(1)"),
@@ -482,8 +502,11 @@ class YtmApp(App):
         self._held = None           # the newest automatic note waiting for that
         self._phase = 0.0           # animation clock, advances only while playing
         self._bar_width = None      # #info width the bar was last drawn for
+        self.mini = False           # popped into mini mode (F2): only the mini line and the prompt
+        self._focus_back = None     # what had focus before mini mode, given back after
 
     def compose(self) -> ComposeResult:
+        yield Static(id="mini")  # shown in mini mode instead of the panels above the prompt
         # Two columns: side by side in the dashboard, stacked (player, library, ask) otherwise.
         with Container(id="body"):
             with Vertical(id="left"):
@@ -595,6 +618,7 @@ class YtmApp(App):
         if self.query_one("#art").styles.display != show:
             self.query_one("#art").styles.display = show
             self.call_after_refresh(self.render_now)  # the bar's width depends on the art
+        self.main.set_class(show == "block", "art")  # centres the song beside the art (CSS)
 
     @property
     def main(self):
@@ -659,7 +683,7 @@ class YtmApp(App):
     def apply_layout(self):
         """Show the theme's layout, or classic when the window is too small for it."""
         want = theme.apply_vibe(self.theme_spec, self.vibe)["layout"]
-        lay = want if self.fits(want) else "classic"
+        lay = want if self.fits(want) and not self.mini else "classic"  # mini mode stacks like classic
         if lay != self.layout:
             self.layout = lay
             self._art_id = None  # art size depends on layout: fetch again
@@ -667,7 +691,7 @@ class YtmApp(App):
         for name in theme.LAYOUTS:
             self.main.set_class(name == lay, f"layout-{name}")
         self.main.set_class(self.size.height < 28, "tight")  # panels lose their gaps
-        tip = f"next layout · type layout to pick · now {lay}" + (f" ({want} needs {DASH_MIN[0]}x{DASH_MIN[1]})" if lay != want else "")
+        tip = f"next layout · type layout to pick · now {lay}" + (f" ({want} needs {DASH_MIN[0]}x{DASH_MIN[1]})" if lay != want and not self.mini else "")
         if self.query_one("#layout").tooltip != tip:
             self.query_one("#layout").tooltip = tip
         self.fit_art()
@@ -679,8 +703,8 @@ class YtmApp(App):
         def panels(lay):
             return {"ask", "player"} | ({"library"} if lay != "focus" else set()) | ({"viz"} if lay == "dashboard" else set())
         pinned = set(self.settings["pinned"]) | {"ask"}
-        shown = panels(self.layout) | pinned
-        if self.layout != "dashboard":  # the dashboard only shows at DASH_MIN, where all four fit
+        shown = {"ask"} if self.mini else panels(self.layout) | pinned  # popped mini mode: pins wait until it's back
+        if self.layout != "dashboard" and not self.mini:  # the dashboard only shows at DASH_MIN, where all four fit
             tight = self.size.height < 28
             gaps = 0 if tight else 4  # not tight: margins between panels
             big = self.layout == "hero" and self.main.has_class("tall")
@@ -699,6 +723,13 @@ class YtmApp(App):
         for p in PANELS:
             if self.query_one(f"#{p}").display != (p in shown):
                 self.query_one(f"#{p}").display = p in shown
+        auto = "player" not in shown and self.size.height >= 6  # too small for the player: the mini line stands in
+        if self.main.has_class("mini") != (self.mini or auto):
+            self.main.set_class(self.mini or auto, "mini")
+            self.call_after_refresh(self.render_now)  # its width is known once it's shown
+        self.main.set_class(self.mini or (auto and self.size.height < 8), "mini-only")  # no room for the footer either
+        if self.mini:
+            return
         if new := [p for p in PANELS if p in panels(want) - shown - self._noted]:  # once a session per panel
             self._noted |= set(new)
             self.say(f"{' · '.join(new)} hidden, window too small · pin {new[0]} to keep it", True)
@@ -1002,12 +1033,28 @@ class YtmApp(App):
         self.query_one("#headline").display = bool(line)
 
         pos, dur = s["time-pos"], s["duration"]
+        self.render_mini(title, artist, pos, dur)
         right = f"  {theme.progress_label(t, pos, dur)}   vol {int(s['volume'] or 0)}%"
         full, cursor, empty = theme.progress_bar(t, max(10, width - len(right)), pos, dur)
         self.query_one("#bar").update(
             f"[{C['mauve']}]{escape(full)}[/][b {C['pink']}]{escape(cursor)}[/][{C['s1']}]{escape(empty)}[/]"
             f"[{C['sub']}]{escape(right)}[/]"
         )
+
+    def render_mini(self, title, artist, pos, dur):
+        """Mini mode: ▶ title · artist and the time on one line, a thin bar under it."""
+        w = self.query_one("#mini").content_size.width
+        if w < 10:
+            return  # hidden
+        when = f"{theme.fmt(pos)} / {theme.fmt(dur)}" if dur else ""
+        room = w - 3 - len(when) - 2
+        name = clip(title, room)
+        by = clip(f" · {artist}", room - len(name)) if artist and room - len(name) > 4 else ""
+        gap = " " * max(1, w - 3 - len(name) - len(by) - len(when))
+        n = round(w * theme._clamp(pos, dur) / dur) if dur else 0
+        self.query_one("#mini").update(
+            f"[b {C['mauve']}]{'⏸' if self.state['pause'] else '▶'}[/]  [b {C['pink']}]{escape(name)}[/][{C['sub']}]{escape(by)}[/]"
+            f"{gap}[{C['dim']}]{when}[/]\n[{C['mauve']}]{'━' * n}[/][{C['s1']}]{'─' * (w - n)}[/]")
 
     def render_controls(self):
         self.query_one("#pause").label = "▶" if self.state["pause"] else "⏸"
@@ -1052,7 +1099,7 @@ class YtmApp(App):
                 pairs += [("d", d)] if d else []
             pairs += [("←→", "tabs"), ("esc", "back")]
         else:
-            pairs = [("enter", "search"), ("tab", "list"), ("^space", "pause"), ("^n", "next"), ("?", "help")]
+            pairs = [("enter", "search"), ("tab", "list"), ("^space", "pause"), ("?", "help"), ("f2", "mini"), ("^n", "next")]
         _, _, why = brain.budget(self.lib, self.settings)
         today = sum(usd for _, usd in self.lib.spend(settings.start_of("today")).values())
         why = None if why == "mode off" else why
@@ -1115,8 +1162,10 @@ class YtmApp(App):
         if not items:
             empty = {"liked": "no liked songs yet · press ♥ on a song",
                      "playlists": "no playlists yet · use ≡ playlist on any song, or type save <name>",
-                     "queue": "queue is empty · search for a song"}.get(self.view, "nothing here")
-            items = [ListItem(Label(f"[{C['dim']}]{empty}[/]"))]
+                     "queue": "queue is empty · search for a song",
+                     "history": "no history yet · songs you play show up here",
+                     "playlist": "this playlist is empty · press s on any song to add it"}.get(self.view, "no results · type a song name below")
+            items = [ListItem(Label(f"[{C['dim']}]{empty}[/]"), classes="empty")]
         lv.clear()
         lv.extend(items)
         index = min(old or 0, len(items) - 1)
@@ -1364,10 +1413,8 @@ class YtmApp(App):
             p.toggle_pause()
         elif bid == "next":
             self.action_next()
-        elif bid == "voldown":
-            p.set_volume((self.state["volume"] or 0) - 10)
-        elif bid == "volup":
-            p.set_volume((self.state["volume"] or 0) + 10)
+        elif bid in ("voldown", "volup"):
+            self.action_volume(10 if bid == "volup" else -10)
         elif bid == "auto":
             self.toggle_auto()
         elif bid == "theme":  # instant: cycle through every theme in the library
@@ -1377,8 +1424,7 @@ class YtmApp(App):
         elif bid == "layout":  # instant: next layout that fits the window
             self.pick_layout()
         elif bid == "like_now":
-            t = self.current_track()
-            self.like(t) if t else self.say("nothing playing")
+            self.action_like()
 
     # ---- list interaction ----
     @on(ListView.Highlighted, "#list")
@@ -1463,6 +1509,35 @@ class YtmApp(App):
 
     def action_focus_prompt(self):
         self.query_one("#prompt").focus()
+
+    def action_volume(self, step):
+        self.player.set_volume((self.state["volume"] or 0) + step)
+
+    def action_like(self):
+        t = self.current_track()
+        self.like(t) if t else self.say("nothing playing")
+
+    def action_auto(self):
+        self.toggle_auto()
+
+    def action_themes(self):
+        if not isinstance(self.screen, ModalScreen):  # one popup at a time
+            self.choose_theme()
+
+    def action_layouts(self):
+        if not isinstance(self.screen, ModalScreen):
+            self.choose_layout()
+
+    def action_mini(self):
+        """Pop into mini mode (just the song line and the prompt) and back out, with the
+        layout, pins and focus as they were: it only hides panels, it changes no setting."""
+        if not self.mini:
+            self._focus_back = self.focused
+        self.mini = not self.mini
+        self.apply_layout()
+        back = self.query_one("#prompt") if self.mini else (self._focus_back or self.query_one("#prompt"))
+        self.call_after_refresh(back.focus)
+        self.say("mini · F2 brings everything back" if self.mini else "")
 
 
 def main():
