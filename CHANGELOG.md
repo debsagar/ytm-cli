@@ -8,6 +8,13 @@ All notable changes to this project are documented here. Versions follow [Semant
 - `layout` opens a layout picker: each layout with its description, the current one marked, ones too big for the window dimmed; moving the highlight previews it, Enter keeps it, Esc puts yours back. ▦ still cycles.
 - A small window hides panels instead of squashing them: the visualizer first, then the library, then the player; the prompt never hides. `pin viz` / `unpin viz` (or `set pinned viz library`) keep a panel on a small window and show it in any layout, even classic. Panels come back when the window grows.
 - `theme` (or `themes`) opens a theme picker: every theme with a colour swatch, its motif and layout; moving the highlight previews it, Enter keeps it like ◐, Esc puts yours back. `theme <name>` picks one directly and suggests the closest name for a typo.
+- Mini mode: F2 (or Ctrl+P) collapses ytm to one line (▶ title · artist, time) over a thin progress bar, plus the prompt, for a small corner window; F2 again brings back the layout, pinned panels and focus as they were. It also shows on its own when the window is too small for the player panel.
+- Keys for every control, all usable while typing: Ctrl+↑/↓ volume, Ctrl+L like, Ctrl+R autoplay, Ctrl+T theme picker, Ctrl+G layout picker, F1 help. The help popup and footer list them.
+
+### Changed
+- Panels share one quiet border and title colour; only the focused panel takes the theme's accent. The footer keys use the same quiet tone.
+- The song info sits centred beside the album art. The dashboard's controls sit right under the progress bar, the focus layout centres them, and the visualizer is drawn at reduced weight.
+- Empty list tabs say what fills them, centred (e.g. "no history yet · songs you play show up here").
 
 ### Fixed
 - A search that starts with a command word ("quit playing games", "save your tears", "p diddy") searches instead of running the command.

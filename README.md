@@ -67,6 +67,8 @@ ytm finds mpv in `C:\Program Files\MPV Player`, a `bin` folder inside the repo, 
 - Tab moves into the list: Enter plays, `a` adds to the queue, `l` likes, `s` adds to a playlist, `d` removes. ←/→ switch between the queue, history, liked, playlists and results tabs. Esc goes back to the prompt.
 - Every button and tab is clickable: playback, ♥ like, volume, autoplay, and actions for the selected song.
 - Ctrl+Space pause · Ctrl+N next · Ctrl+B previous · Ctrl+←/→ seek
+- Ctrl+↑/↓ volume · Ctrl+L like · Ctrl+R autoplay · Ctrl+T themes · Ctrl+G layouts · F1 help. These work while you type.
+- F2 (or Ctrl+P) pops into mini mode: one song line, a thin bar and the prompt, for a small corner window. F2 again brings everything back. A window too small for the player shows the mini line on its own.
 - Type `?` for the full help.
 
 ### Themes and layouts
