@@ -1,0 +1,11 @@
+[
+ {"name": "stage", "size": [190, 50], "theme": "neon rave", "feats": {"energy": 0.8},
+  "songs": [{"id": "aaaaaaaaaaa", "title": "Midnight Drive", "artist": "Neon"}], "pos": 70,
+  "steps": [{"wait": 1}, {"shot": "f1", "wait": 0.1}, {"shot": "f2", "wait": 0.1}, {"shot": "f3", "wait": 0.1}]},
+ {"name": "dashboard", "size": [190, 50], "theme": "dream haze", "feats": {"energy": 0.4},
+  "songs": [{"id": "aaaaaaaaaaa", "title": "Slow Clouds", "artist": "Haze"}], "pos": 70,
+  "steps": ["layout dashboard", {"wait": 1}, {"shot": "f1", "wait": 0.1}, {"shot": "f2", "wait": 0.1}, {"shot": "f3", "wait": 0.1}]},
+ {"name": "classic", "size": [190, 50], "theme": "dream haze",
+  "songs": [{"id": "aaaaaaaaaaa", "title": "Slow Clouds", "artist": "Haze"}], "pos": 70,
+  "steps": [{"wait": 1}]}
+]

@@ -9,6 +9,12 @@ All notable changes to this project are documented here. Versions follow [Semant
 - A small window hides panels instead of squashing them: the visualizer first, then the library, then the player; the prompt never hides. `pin viz` / `unpin viz` (or `set pinned viz library`) keep a panel on a small window and show it in any layout, even classic. Panels come back when the window grows.
 - `theme` (or `themes`) opens a theme picker: every theme with a colour swatch, its motif and layout; moving the highlight previews it, Enter keeps it like ◐, Esc puts yours back. `theme <name>` picks one directly and suggests the closest name for a typo.
 
+### Changed
+- Smoother, calmer motion: the equaliser draws thin bars with gaps that ease toward their height (quick up, slow down) at 12 frames a second, swaying slower for slower songs; the motif scrolls by the clock; the blocks progress bar ends in an eighth-block cell and creeps between seconds.
+- Less work when nothing moves: the animation timer runs only while a song plays and something animated is on screen, at 1 frame a second with `motion low` or when the terminal is in the background, never with `motion off`. Housekeeping (mpv check, settings reload, layout fit) runs once a second instead of four times. Unchanged text is not redrawn, and the song id is no longer asked of mpv on every update.
+- History reads only the end of `history.tsv`; the events table has an index on (type, at).
+- Dev: `dev/check.py` runs ruff, a history self-check and every scenario in one line; `try.py` runs scenarios in parallel (5 min → 1 min) and can render PNGs (`--png`, `--open`) and mid-scenario frames (`{"shot": ...}`).
+
 ### Fixed
 - A search that starts with a command word ("quit playing games", "save your tears", "p diddy") searches instead of running the command.
 - `set`: suggests the right key for a wrong one, accepts `key = value`, quotes, lists and any case, and never overwrites a `settings.toml` that has a syntax error. Bad values in the file are reported per key instead of silently ignored.

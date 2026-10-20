@@ -42,7 +42,7 @@ on_mount
 ├─ show("history") → fill_list                      the default tab
 ├─ render_now, render_controls, apply_layout
 ├─ #art ← empty_art()
-├─ set_interval(0.25, tick)                         the main loop (section 3)
+├─ set_interval(1, tick)                            housekeeping (section 3); animate runs on its own timer
 ├─ #prompt.focus()
 ├─ context.usual_vibe(lib) → vibe, apply_theme()    the vibe you usually settle on at this daypart
 ├─ context.resume(lib) → loadfile paused at the saved position (never plays sound)
@@ -58,7 +58,8 @@ on_mount
 
 | what | where | how often | does |
 |---|---|---|---|
-| tick | `YtmApp.tick` | 0.25 s | every 8th tick (2 s): `Settings.reload` and a footer redraw if settings.toml changed. Every tick: `apply_layout`, `render_now` if `#info` changed width, advance `_phase` while playing, `#motif` scroll, `#eq` (stage), `#viz_eq`/`#viz_cap` (dashboard). `motion=low` draws 1 frame a second, `off` freezes `_phase` |
+| tick | `YtmApp.tick` | 1 s | every 2nd tick: mpv check, `Settings.reload` and a footer redraw if settings.toml changed. Every tick: `refit` (`apply_layout`, `render_now` if `#info` changed width); `on_resize` also calls `refit` 0.3 s later |
+| animate | `YtmApp.animate` | 1/12 s | started and stopped by `animate_when_needed` (from `apply_layout`, pause/time-pos, `app_focus`): runs only while playing with something animated on screen; 1 s for `motion=low` or a blurred terminal, none for `off` (one still frame instead). Advances `_phase` by elapsed time, draws `#motif`, `#eq` (stage), `#viz_eq`/`#viz_cap`, and `render_bar` (the bar head creeps between mpv's per-second updates). `put` skips identical text and the layout pass |
 | backlog | the inner `backlog()` in `on_mount` | 30 s | when a song is playing, not paused, and no worker is running: a `backlog` thread worker runs `brain.measure_next`. The timer stops when it returns `False` (nothing left) |
 | mpv events | `Player._event_loop` (daemon thread) | per property change | `on_change(name, value)` = `YtmApp._from_mpv` |
 
@@ -276,7 +277,7 @@ Coupling points the widget refactor has to handle:
 2. **`tick` crosses panels.** It drives the player panel (`#motif`, `#eq`, the `#info` width), the dashboard visualizer (`#viz_eq`, `#viz_cap`), layout (`apply_layout`) and the settings reload/footer.
 3. **Global colours baked into markup.** `C` is mutated in place, and `Row`, `PlaylistRow`, `HelpScreen`, `keys()` and `render_now` put `C[...]` hex values into markup when they build it. So `apply_theme` has to rebuild the list (`fill_list`) and redraw the footer and player after every theme change.
 4. **`_art_id` has two jobs.** It's the art cache key and the "song changed" test in `_apply` (`current_id() != _art_id`). `apply_layout` and `fit_art` reset it to force a refetch.
-5. **The effective theme is recomputed everywhere.** `theme.apply_vibe(theme_spec, vibe)` runs in `apply_theme`, `apply_layout`, `tick` and `render_now`.
+5. **The effective theme is cached.** `YtmApp.vibed` recomputes `theme.apply_vibe(theme_spec, vibe)` only when either changes (specs are replaced, never edited in place).
 6. **Bar width depends on art.** `render_now` sizes `#bar` from `#info`'s width, which depends on `#art` being shown. `tick` compares `_bar_width`, and `on_resize`/`fit_art` use `call_after_refresh`.
 7. **One state bag.** mpv `state`, `known`, `results`, `view`, `open_playlist`, `theme_spec`, `vibe`, `song_feats`, `layout`, `_played`, `_log` and `_phase` all live on `YtmApp`, and panels read each other's state.
 8. **Threads touch app state.** `do_search` assigns `self.results` on its worker thread, and `think` calls `current_id()` (a Player IPC round-trip) from its thread.

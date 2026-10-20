@@ -14,6 +14,7 @@ draws from the primitives below, so any spec (even a broken one) renders safely.
   }
 """
 
+import math
 import re
 import unicodedata
 
@@ -181,21 +182,31 @@ def motif_line(theme, width, offset=0):
 
 
 BARS = " ▁▂▃▄▅▆▇█"
+EIGHTHS = " ▏▎▍▌▋▊▉"  # a cell filled from the left, in eighths
 
 
-def equaliser(width, rows, t, energy):
-    """A decorative equaliser: deterministic waves from time `t` and song energy (0..1).
-    Not real audio analysis: that would mean decoding the stream ourselves."""
-    import math
+def equaliser(width, rows, t, energy, levels=None, dt=0.0):
+    """A decorative equaliser: one-cell bars with a gap between, swaying with time `t` and song
+    energy (0..1). Not real audio analysis: that would mean decoding the stream ourselves.
+    `levels` (a list kept by the caller) makes each bar ease toward its target over `dt` seconds:
+    quick to rise, slow to fall, so frames never jump."""
     full = rows * 8
-    levels = []
-    for x in range(width):
-        wave = (math.sin(x * 0.35 + t * 3.1) + math.sin(x * 0.13 - t * 1.7) + math.sin(x * 0.71 + t * 5.3)) / 3
-        h = (0.25 + 0.75 * energy) * (0.55 + 0.45 * wave) * full
-        levels.append(max(1, min(full, round(h))))
+    n = (width + 1) // 2
+    targets = []
+    for x in range(n):
+        wave = (math.sin(x * 0.55 + t * 2.3) + math.sin(x * 0.23 - t * 1.3) + 0.5 * math.sin(x * 1.3 + t * 3.7)) / 2.5
+        targets.append((0.2 + 0.7 * energy) * (0.55 + 0.45 * wave) * full)
+    if levels is None:
+        levels = []
+    if len(levels) != n:  # first frame, or a new width: start on target
+        levels[:] = targets
+    for i, goal in enumerate(targets):
+        rate = 14 if goal > levels[i] else 5  # per second
+        levels[i] += (goal - levels[i]) * (1 - math.exp(-rate * dt))
+    cells = [max(1, min(full, round(lv))) for lv in levels]
     lines = []
     for r in range(rows - 1, -1, -1):  # top row first
-        lines.append("".join(BARS[max(0, min(8, lv - r * 8))] for lv in levels))
+        lines.append(" ".join(BARS[max(0, min(8, lv - r * 8))] for lv in cells)[:width])
     return "\n".join(lines)
 
 
@@ -237,9 +248,13 @@ def progress_label(theme, pos, dur):
 
 
 def progress_bar(theme, width, pos, dur):
-    """(filled, cursor, empty) strings for a bar `width` cells wide."""
+    """(filled, cursor, empty) strings for a bar `width` cells wide. The solid "blocks" style
+    ends in an eighth-block cell, so the head creeps instead of jumping a whole cell."""
     full, empty, _ = PROGRESS[theme["progress"]["style"]]
     cursor = theme["progress"]["cursor"]
     width = max(4, width - len(cursor))
-    filled = int(width * _clamp(pos, dur) / dur) if dur else 0
-    return full * filled, cursor, empty * (width - filled)
+    eighths = int(8 * width * _clamp(pos, dur) / dur) if dur else 0
+    filled, part = divmod(eighths, 8)
+    if full != "█" or cursor or not part or filled >= width:
+        return full * filled, cursor, empty * (width - filled)
+    return full * filled + EIGHTHS[part], cursor, empty * (width - filled - 1)

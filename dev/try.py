@@ -1,6 +1,9 @@
 """Render ytm scenarios headlessly and report what broke. No mpv, no network, no API spend.
 
-    python dev/try.py dev/breaks/*.json [--out DIR] [--svg]
+    python dev/try.py dev/breaks/*.json [--out DIR] [--svg | --png [--open]] [--jobs N]
+
+Several files run in parallel child processes (--jobs, default 6); --png renders the
+screens to PNG with headless Chrome or Edge, --open opens them.
 
 A scenario is a JSON object (or a list of them). Every field is optional:
   name      label for the output files
@@ -15,6 +18,7 @@ A scenario is a JSON object (or a list of them). Every field is optional:
   settings  {key: "value"} applied with `set`, or raw text for settings.toml
   steps     list of: "text typed + Enter" | {"key": "tab"} | {"resize": [w, h]}
             | {"mpv": {"time-pos": 99}} | {"click": "#id", "times": 2} | {"wait": 0.5}
+            | {"shot": "label"} (with --svg: saves <name>-<label>.svg mid-run, e.g. animation frames)
   expect    strings that must appear on screen at the end
   absent    strings that must NOT appear (e.g. "Traceback", "None")
 
@@ -27,10 +31,14 @@ import glob
 import io
 import json
 import os
+import re
 import shutil
+import subprocess
 import sys
 import tempfile
+import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 os.environ.pop("NO_COLOR", None)
@@ -203,6 +211,8 @@ async def run(sc, out, svg):
                         app._apply(k, v)
                 elif "click" in step:
                     await pilot.click(step["click"], times=step.get("times", 1))
+                elif "shot" in step and svg:
+                    app.save_screenshot(f"{name}-{step['shot']}.svg", str(out))
                 await pilot.pause(step.get("wait", 0.3) if isinstance(step, dict) else 0.3)
             await pilot.pause(0.3)
             text = screen_text(app)
@@ -224,23 +234,87 @@ async def run(sc, out, svg):
     return errors
 
 
+CHROMES = [shutil.which("chrome"), shutil.which("google-chrome"), shutil.which("msedge"),
+           r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+           r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"]
+
+
+def to_png(svgs):
+    """SVG -> PNG with headless Chrome (or Edge), sized from the SVG's viewBox. Returns the PNGs."""
+    chrome = os.environ.get("CHROME") or next((c for c in CHROMES if c and Path(c).exists()), None)
+    if not chrome:
+        sys.exit("--png needs Chrome or Edge: install one, or set CHROME to its path")
+
+    def one(svg):
+        m = re.search(r'viewBox="[\d.]+ [\d.]+ ([\d.]+) ([\d.]+)"', svg.read_text(encoding="utf-8"))
+        w, h = (int(float(m.group(1))) + 1, int(float(m.group(2))) + 1) if m else (1200, 800)
+        png = svg.with_suffix(".png")
+        png.unlink(missing_ok=True)
+        subprocess.run([chrome, "--headless=new", "--disable-gpu", "--hide-scrollbars", f"--window-size={w},{h}",
+                        f"--screenshot={png}", svg.resolve().as_uri()], capture_output=True, timeout=60)
+        return png if png.exists() else print(f"PNG FAILED {svg}")
+    with ThreadPoolExecutor(4) as pool:
+        return [p for p in pool.map(one, svgs) if p]
+
+
+def split(files, jobs):
+    """Run the scenario files in `jobs` child processes (each scenario patches module globals,
+    so they can't share one). Returns how many scenarios failed."""
+    chunks, load = [[] for _ in range(jobs)], [0] * jobs
+    for n, f in sorted(((len(d) if isinstance(d := json.loads(Path(f).read_text(encoding="utf-8")), list) else 1, f)
+                        for f in files), reverse=True):  # biggest files first, each to the least loaded child
+        i = load.index(min(load))
+        chunks[i].append(f)
+        load[i] += n
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    procs = [subprocess.Popen([sys.executable, __file__, *c, "--jobs", "1", "--out", str(OUT), *SVG],
+                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env) for c in chunks if c]
+    failed = 0
+    for pr in procs:
+        text = pr.communicate()[0].decode("utf-8", "replace").replace("\r\n", "\n")
+        lines = text.split("\n\n")[0]  # each child's own summary line is dropped
+        print(lines.rstrip())
+        fails = sum(line.startswith("FAIL ") for line in lines.splitlines())
+        if pr.returncode and not fails:  # the child itself crashed
+            print(f"FAIL child process\n{text}")
+            fails = 1
+        failed += fails
+    return failed
+
+
 async def main():
+    global OUT, SVG
     ap = argparse.ArgumentParser()
     ap.add_argument("files", nargs="+")
     ap.add_argument("--out", default=str(Path(tempfile.gettempdir()) / "ytm-try"))
     ap.add_argument("--svg", action="store_true")
+    ap.add_argument("--png", action="store_true", help="also turn the SVGs into PNGs (needs Chrome or Edge)")
+    ap.add_argument("--open", action="store_true", help="open the PNGs when done")
+    ap.add_argument("--jobs", type=int, default=min(6, os.cpu_count() or 1), help="child processes (default 6)")
     a = ap.parse_args()
-    out = Path(a.out)
-    out.mkdir(parents=True, exist_ok=True)
+    sys.stdout.reconfigure(errors="replace")  # a cp1252 console can't print every screen character
+    OUT, SVG = Path(a.out), ["--svg"] if a.svg or a.png or a.open else []
+    OUT.mkdir(parents=True, exist_ok=True)
+    started = time.time()
+    files = [g for f in a.files for g in sorted(glob.glob(f)) or [f]]  # PowerShell passes *.json unexpanded
     failed = 0
-    for f in [g for f in a.files for g in sorted(glob.glob(f)) or [f]]:  # PowerShell passes *.json unexpanded
-        data = json.loads(Path(f).read_text(encoding="utf-8"))
-        for i, sc in enumerate(data if isinstance(data, list) else [data]):
-            sc.setdefault("name", f"{Path(f).stem}-{i}" if isinstance(data, list) else Path(f).stem)
-            errs = await run(sc, out, a.svg)
-            failed += bool(errs)
-            print(("FAIL " if errs else "PASS ") + sc["name"] + ("".join(f"\n     {e.strip().splitlines()[-1]}" for e in errs)))
-    print(f"\n{failed} failed · screens in {out}")
+    if a.jobs > 1 and len(files) > 1:
+        failed = split(files, min(a.jobs, len(files)))
+    else:
+        for f in files:
+            data = json.loads(Path(f).read_text(encoding="utf-8"))
+            for i, sc in enumerate(data if isinstance(data, list) else [data]):
+                sc.setdefault("name", f"{Path(f).stem}-{i}" if isinstance(data, list) else Path(f).stem)
+                errs = await run(sc, OUT, bool(SVG))
+                failed += bool(errs)
+                print(("FAIL " if errs else "PASS ") + sc["name"] + ("".join(f"\n     {e.strip().splitlines()[-1]}" for e in errs)))
+    pngs = []
+    if a.png or a.open:
+        pngs = to_png([f for f in OUT.glob("*.svg") if f.stat().st_mtime >= started])
+    print(f"\n{failed} failed · {time.time() - started:.0f} s · screens in {OUT}" + (f" · {len(pngs)} PNGs" if pngs else ""))
+    if a.open:
+        for png in pngs:
+            os.startfile(png)
     sys.exit(1 if failed else 0)
 
 
