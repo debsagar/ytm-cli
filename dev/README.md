@@ -3,10 +3,14 @@
 There are no hand-written test lists here. Each round, someone (usually an LLM agent) reads the code and writes the scenarios **most likely to break it**, the counterexamples. Only scenarios that actually broke something are kept, in `breaks/`.
 
 ```powershell
-uv run python dev/try.py dev/breaks/*.json     # replay every known break
+uv run python dev/check.py                     # before a commit: ruff + history self-check + every break, one summary line
+uv run python dev/try.py dev/breaks/*.json     # replay every known break (6 child processes in parallel, ~1 min)
 uv run python dev/try.py my_idea.json --svg    # try a new idea; screens go to %TEMP%\ytm-try
 uv run python dev/palette_check.py              # theme colour rules and brain.motion, pure code
+uv run python dev/try.py dev/shots/motion.json --png --open   # PNG screenshots (headless Chrome or Edge), opened
 ```
+
+`--png` needs Chrome or Edge (set `CHROME` to its path if it isn't found). A `{"shot": "f1", "wait": 0.1}` step saves a screen mid-scenario, e.g. animation frames; `dev/shots/` holds scenarios that are only for looking at. `--jobs 1` runs everything in one process (slower, easier to debug).
 
 `try.py` renders the real UI with a fake player: no mpv, no network and no API spend. The scenario format is described at the top of the file.
 

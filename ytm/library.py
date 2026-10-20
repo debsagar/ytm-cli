@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS features (id TEXT PRIMARY KEY, data TEXT);  -- Jev ju
 CREATE TABLE IF NOT EXISTS themes (name TEXT PRIMARY KEY, spec TEXT, created REAL);  -- LLM-written themes
 CREATE TABLE IF NOT EXISTS centres (name TEXT PRIMARY KEY, vec TEXT);  -- learned cluster centres
 CREATE TABLE IF NOT EXISTS events (at REAL, type TEXT, id TEXT, data TEXT);  -- play/skip/tweak signals
+CREATE INDEX IF NOT EXISTS events_type_at ON events (type, at);  -- spend(), resume() and context read by type
 """
 
 
@@ -31,20 +32,25 @@ def history(limit=50):
     """Most recent plays first, one entry per song."""
     if not HISTORY.exists():
         return []
-    out, seen = [], set()
-    for line in reversed(HISTORY.read_text(encoding="utf-8", errors="replace").splitlines()):
-        parts = line.split("\t", 2)
-        m = VID_RE.search(parts[1]) if len(parts) == 3 else None
-        if not m:
-            continue
-        vid = m.group(1)
-        if vid in seen:
-            continue
-        seen.add(vid)
-        out.append(Track(vid, parts[2]))
-        if len(out) >= limit:
-            break
-    return out
+    with open(HISTORY, "rb") as fh:  # read the tail, growing it only if it holds too few songs
+        size, chunk = fh.seek(0, 2), 64 * 1024
+        while True:
+            start = max(0, size - chunk)
+            fh.seek(start)
+            lines = fh.read().decode("utf-8", errors="replace").splitlines()[bool(start):]  # first may be cut
+            out, seen = [], set()
+            for line in reversed(lines):
+                parts = line.split("\t", 2)
+                m = VID_RE.search(parts[1]) if len(parts) == 3 else None
+                if not m or m.group(1) in seen:
+                    continue
+                seen.add(m.group(1))
+                out.append(Track(m.group(1), parts[2]))
+                if len(out) >= limit:
+                    return out
+            if not start:
+                return out
+            chunk *= 4
 
 
 class Library:

@@ -390,6 +390,7 @@ class YtmApp(App):
     Screen.layout-dashboard #motif {{ display: none; }}
     Screen.layout-dashboard #controls {{ layout: vertical; height: 2; }}
     #viz_eq {{ height: 1fr; color: $ytm-mauve 40%; }}  /* light: decoration, not the main thing */
+    #motif, #eq, #viz_eq, #bar {{ text-wrap: nowrap; }}  /* drawn to width every frame: skip the wrapping pass */
     #viz_cap {{ height: 1; color: $ytm-dim; text-wrap: nowrap; text-overflow: ellipsis; }}
     Screen.layout-focus #title {{ text-align: center; }}
     Screen.layout-focus #artist, Screen.layout-focus #headline, Screen.layout-focus #motif {{ text-align: center; }}
@@ -500,7 +501,15 @@ class YtmApp(App):
         self._log = []              # recent messages, shown in the dashboard's ask panel
         self._said = -math.inf      # when the user last got a reply (automatic notes wait 5 s after it)
         self._held = None           # the newest automatic note waiting for that
-        self._phase = 0.0           # animation clock, advances only while playing
+        self._phase = 0.0           # animation clock (seconds of playing), advances only while playing
+        self._frame_at = None       # when the last animation frame was drawn (monotonic)
+        self._anim = None           # the animation timer, running only while something moves
+        self._anim_rate = None      # its interval in seconds
+        self._levels = {"eq": [], "viz_eq": []}  # equaliser bar heights, eased frame to frame
+        self._shown = {}            # widget id -> text last drawn there (skip identical updates)
+        self._vibed = (None, None, None)  # (theme_spec, vibe, theme with the vibe applied)
+        self._cid = False           # current video id, cached (False: look it up again)
+        self._pos_at = 0.0          # when time-pos last changed (monotonic): the bar head creeps from there
         self._bar_width = None      # #info width the bar was last drawn for
         self.mini = False           # popped into mini mode (F2): only the mini line and the prompt
         self._focus_back = None     # what had focus before mini mode, given back after
@@ -564,7 +573,7 @@ class YtmApp(App):
         self.render_controls()
         self.apply_layout()
         self.query_one("#art").update(self.empty_art())
-        self.set_interval(0.25, self.tick)
+        self.set_interval(1, self.tick)
         self.query_one("#prompt").focus()
         vibe = context.usual_vibe(self.lib)  # the vibe you usually settle on at this time of day
         if vibe and vibe != self.vibe:
@@ -603,6 +612,10 @@ class YtmApp(App):
     def on_resize(self, event):
         self.apply_layout()
         self.call_after_refresh(self.render_now)  # widths are only known after layout
+        self.set_timer(0.3, self.refit)  # the new size can arrive a moment later
+
+    def watch_app_focus(self, focused):
+        self.animate_when_needed()  # in the background: 1 frame a second
 
     def fit_art(self):
         """Show art only when there's room (big hero art only when tall). Runs on resize,
@@ -642,6 +655,10 @@ class YtmApp(App):
 
     def _apply(self, name, value):
         self.state[name] = value
+        if name in ("playlist-pos", "playlist-count", "media-title"):
+            self._cid = False  # the song may have changed: ask mpv again
+        if name == "time-pos":
+            self._pos_at = time.monotonic()
         if name in ("playlist-pos", "playlist-count"):
             if self.view == "queue":
                 self.fill_list()
@@ -658,16 +675,34 @@ class YtmApp(App):
             self.render_controls()
         if name == "pause":
             self.render_controls()
+        if name in ("pause", "time-pos"):
+            self.animate_when_needed()  # starts or stops with playback
         self.render_now()
 
     # ---- themes: the brain proposes, instant controls adjust ----
     def get_css_variables(self):
         return {**super().get_css_variables(), **{f"ytm-{k}": v for k, v in C.items()}}
 
+    @property
+    def vibed(self):
+        """The theme with the vibe applied, recomputed only when either changes."""
+        spec, vibe, t = self._vibed
+        if spec is not self.theme_spec or vibe != self.vibe:  # specs are replaced, never edited in place
+            t = theme.apply_vibe(self.theme_spec, self.vibe)
+            self._vibed = (self.theme_spec, self.vibe, t)
+        return t
+
+    def put(self, wid, text, layout=False):
+        """Update a Static only when its text changed: an update means a re-render. Animation
+        frames keep their size, so by default they skip the layout pass (the costly part)."""
+        if self._shown.get(wid) != text:
+            self._shown[wid] = text
+            self.query_one(f"#{wid}").update(text, layout=layout)
+
     def apply_theme(self, spec=None):
         if spec is not None:
             self.theme_spec = theme.normalize(spec)
-        t = theme.apply_vibe(self.theme_spec, self.vibe)
+        t = self.vibed
         C.update(theme.colors(t))
         self.apply_layout()
         self.refresh_css()
@@ -682,7 +717,7 @@ class YtmApp(App):
 
     def apply_layout(self):
         """Show the theme's layout, or classic when the window is too small for it."""
-        want = theme.apply_vibe(self.theme_spec, self.vibe)["layout"]
+        want = self.vibed["layout"]
         lay = want if self.fits(want) and not self.mini else "classic"  # mini mode stacks like classic
         if lay != self.layout:
             self.layout = lay
@@ -696,6 +731,7 @@ class YtmApp(App):
             self.query_one("#layout").tooltip = tip
         self.fit_art()
         self.fit_panels(want)  # after fit_art: the player's height depends on the art
+        self.animate_when_needed()
 
     def fit_panels(self, want):
         """Show the layout's panels plus the pinned ones, then hide unpinned ones, least important
@@ -948,38 +984,81 @@ class YtmApp(App):
         self.think(vid, nxt.group(1) if nxt else None)
 
     def tick(self):
-        """4x a second: re-read settings (every 2 s), re-fit the layout, scroll the motif, move the equalisers."""
+        """Once a second, off the animation path: check mpv and settings (every 2 s), re-fit the layout."""
         if not self.is_running:
             return  # shutting down: the widgets are already being removed
         self._ticks += 1
-        if self._ticks % 8 == 0 and not self.player.restarted:  # mpv died with nobody pressing anything
+        if self._ticks % 2 == 0 and not self.player.restarted:  # mpv died with nobody pressing anything
             self.player.check()
-        if self._ticks % 8 == 0 and self.settings.reload():  # every 2 s: pick up hand edits
+        if self._ticks % 2 == 0 and self.settings.reload():  # every 2 s: pick up hand edits (motion too)
             self.say(escape(self.settings.error or self.settings.bad or "settings reloaded"), True)
             self.render_footer()
-        self.apply_layout()  # also on resize, but the new size can arrive a moment later
+        self.refit()
+
+    def refit(self):
+        """Re-fit the layout; redraw the bar if #info changed width (resize, art shown/hidden, new theme)."""
+        if not self.is_running:
+            return
+        self.apply_layout()
         if self.query_one("#info").content_size.width != self._bar_width:
-            self.render_now()  # layout moved (resize, art shown/hidden, new theme): redraw the bar
+            self.render_now()
+
+    def animated(self):
+        """Whether anything that moves is on screen."""
+        t = self.vibed
+        return bool((theme.MOTIFS.get(t["motif"]) and self.layout != "dashboard") or self.layout == "stage"
+                    or self.query_one("#viz").display
+                    or (theme.PROGRESS[t["progress"]["style"]][0] == "█" and not t["progress"]["cursor"]))
+
+    def animate_when_needed(self):
+        """Run the animation timer at the motion setting's rate (full: 12 fps; low, or in the
+        background: 1 fps) while playing and something animated is on screen; stop it otherwise."""
         motion = self.settings["motion"]
-        if not self.state["pause"] and self.state["time-pos"] is not None and motion != "off":
-            self._phase += 0.25
-        if motion == "low" and self._ticks % 4:
-            return  # 1 frame a second
-        t = theme.apply_vibe(self.theme_spec, self.vibe)
+        playing = not self.state["pause"] and self.state["time-pos"] is not None
+        rate = None
+        if motion != "off" and playing and self.is_running and self.animated():
+            rate = 1 / 12 if motion == "full" and self.app_focus else 1.0
+        if rate != self._anim_rate:
+            if self._anim:
+                self._anim.stop()
+            self._anim, self._anim_rate = rate and self.set_interval(rate, self.animate), rate
+            self._frame_at = time.monotonic()
+        if not rate and self.is_running:  # stopped: still draw a still frame (new theme, size, panel)
+            self._frame_at = time.monotonic()
+            self.animate()
+
+    def animate(self):
+        """One frame. The clock, not the frame count, moves things, so speed doesn't change with the fps."""
+        if not self.is_running:
+            return
+        now = time.monotonic()
+        dt = min(0.5, now - (self._frame_at or now))  # capped: a stalled loop doesn't leap
+        self._frame_at = now
+        self._phase += dt
+        t, f = self.vibed, self.song_feats
         width = self.query_one("#info").content_size.width
-        self.query_one("#motif").update(escape(theme.motif_line(t, width, int(self._phase * 2))))
+        self.put("motif", escape(theme.motif_line(t, width, int(self._phase * 2))))
+        energy = f.get("energy", 0.5)
+        speed = 0.5 + f.get("pace", energy)  # slow songs sway slowly
         if self.layout == "stage":
-            energy = self.song_feats.get("energy", 0.5)
-            self.query_one("#eq").update(theme.equaliser(width, 3, self._phase, energy))
+            self.put("eq", theme.equaliser(width, 3, self._phase * speed, energy, self._levels["eq"], dt))
         if self.query_one("#viz").display:
-            eq, f = self.query_one("#viz_eq"), self.song_feats
-            energy = f.get("energy", 0.5)
-            eq.update(theme.equaliser(eq.content_size.width, max(1, eq.content_size.height), self._phase, energy))
+            eq = self.query_one("#viz_eq")
+            self.put("viz_eq", theme.equaliser(eq.content_size.width, max(1, eq.content_size.height),
+                                               self._phase * speed, energy, self._levels["viz_eq"], dt))
             cap = [t["name"], f.get("mood"), f.get("energy") is not None and f"energy {int(energy * 100)}%"]
-            self.query_one("#viz_cap").update(escape(" · ".join(x for x in cap if x)))
+            self.put("viz_cap", escape(" · ".join(x for x in cap if x)))
+        self.render_bar()
 
     # ---- the song that's playing ----
     def current_id(self):
+        """The playing song's video id. Cached: the lookup is an IPC round trip to mpv, and
+        _apply clears the cache whenever the playlist position, length or title changes."""
+        if self._cid is False:
+            self._cid = self._lookup_id()
+        return self._cid
+
+    def _lookup_id(self):
         pos = self.state["playlist-pos"]
         if pos is None or pos < 0:
             return None
@@ -1023,23 +1102,27 @@ class YtmApp(App):
             title, artist = split_label(s["media-title"])
         else:
             title, artist = "Nothing playing", "search for a song below to start"
-        t = theme.apply_vibe(self.theme_spec, self.vibe)
         self.query_one("#title").update(escape(theme.spaced(title) if self.layout == "hero" else title))
         self.query_one("#artist").update(escape(artist))
-        width = self._bar_width = self.query_one("#info").content_size.width
+        self._bar_width = self.query_one("#info").content_size.width
         f = self.song_feats
         line = " — ".join(x for x in (f.get("headline"), f.get("blurb") if self.vibe != "calm" else "") if x)
         self.query_one("#headline").update(escape(line))
         self.query_one("#headline").display = bool(line)
 
+        self.render_mini(title, artist, s["time-pos"], s["duration"])
+        self.render_bar(layout=True)
+
+    def render_bar(self, layout=False):
+        """The progress bar. Between mpv's once-a-second updates the head creeps on by the clock."""
+        s, t, width = self.state, self.vibed, self._bar_width or 0
         pos, dur = s["time-pos"], s["duration"]
-        self.render_mini(title, artist, pos, dur)
         right = f"  {theme.progress_label(t, pos, dur)}   vol {int(s['volume'] or 0)}%"
+        if pos is not None and not s["pause"]:
+            pos += min(0.99, time.monotonic() - self._pos_at)  # never past the next whole second
         full, cursor, empty = theme.progress_bar(t, max(10, width - len(right)), pos, dur)
-        self.query_one("#bar").update(
-            f"[{C['mauve']}]{escape(full)}[/][b {C['pink']}]{escape(cursor)}[/][{C['s1']}]{escape(empty)}[/]"
-            f"[{C['sub']}]{escape(right)}[/]"
-        )
+        self.put("bar", f"[{C['mauve']}]{escape(full)}[/][b {C['pink']}]{escape(cursor)}[/][{C['s1']}]{escape(empty)}[/]"
+                        f"[{C['sub']}]{escape(right)}[/]", layout)
 
     def render_mini(self, title, artist, pos, dur):
         """Mini mode: ▶ title · artist and the time on one line, a thin bar under it."""

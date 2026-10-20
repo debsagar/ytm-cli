@@ -1,0 +1,41 @@
+[
+ {
+  "name": "motion-motif-still-while-paused",
+  "why": "The animation timer stops while paused; the motif must still be drawn (a still frame), not left blank.",
+  "theme": "dream haze",
+  "paused": true,
+  "size": [74, 30],
+  "songs": [{"id": "aaaaaaaaaaa", "title": "Song", "artist": "A"}],
+  "expect": ["✦ · ✧ · ✦"]
+ },
+ {
+  "name": "motion-off-still-frame",
+  "why": "motion off: no timer at all, but the motif and stage equaliser still show a still frame.",
+  "theme": "neon rave",
+  "settings": {"motion": "off"},
+  "size": [100, 30],
+  "songs": [{"id": "aaaaaaaaaaa", "title": "Song", "artist": "A"}],
+  "expect": ["▁▂▃▅▇▅▃▂"],
+  "absent": ["Traceback"]
+ },
+ {
+  "name": "motion-equaliser-bars-have-gaps",
+  "why": "The equaliser draws one-cell bars with a gap between, never a solid block.",
+  "theme": {"name": "eq test", "layout": "stage", "motif": "none", "progress": {"style": "line"}},
+  "feats": {"energy": 1.0},
+  "size": [100, 30],
+  "songs": [{"id": "aaaaaaaaaaa", "title": "Song", "artist": "A"}],
+  "steps": [{"wait": 0.5}],
+  "absent": ["██", "▇█", "█▇"]
+ },
+ {
+  "name": "motion-progress-head-eighths",
+  "why": "The blocks progress style ends in an eighth-block cell, so the head creeps instead of jumping a whole cell.",
+  "theme": "neon rave",
+  "paused": true,
+  "pos": 33,
+  "size": [74, 24],
+  "songs": [{"id": "aaaaaaaaaaa", "title": "Song", "artist": "A"}],
+  "expect": ["███████▍░"]
+ }
+]

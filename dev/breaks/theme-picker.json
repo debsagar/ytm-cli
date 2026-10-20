@@ -209,7 +209,8 @@
   "steps": [
    "theme",
    {
-    "key": "end"
+    "key": "end",
+    "wait": 0.8
    }
   ],
   "expect": [
