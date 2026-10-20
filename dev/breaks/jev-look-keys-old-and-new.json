@@ -1,0 +1,25 @@
+[
+ {
+  "name": "jev-feats-without-look-keys",
+  "why": "Songs measured before pace/bright/texture existed have only energy, mood and tags in the cache. They must still play and style (the dashboard visualizer shows their energy) without re-judging.",
+  "songs": [{"id": "aaaaaaaaaaa", "title": "Old Song", "artist": "A"}],
+  "feats": {"energy": 0.8, "mood": "dark", "mood_p": {"dark": 1}, "tag_p": {"club": 0.9}, "tags": ["club"]},
+  "theme": "dark techno",
+  "size": [100, 30],
+  "steps": ["layout dashboard"],
+  "expect": ["energy 80%"],
+  "absent": ["Traceback", "KeyError"]
+ },
+ {
+  "name": "jev-feats-with-look-keys",
+  "why": "Songs measured now also carry pace, bright and texture (0..1); extra keys must not upset anything that reads features.",
+  "songs": [{"id": "aaaaaaaaaaa", "title": "New Song", "artist": "A"}],
+  "feats": {"energy": 0.3, "mood": "dreamy", "mood_p": {"dreamy": 1}, "tag_p": {}, "tags": [],
+            "pace": 0.2, "bright": 0.7, "texture": 0.4},
+  "theme": "dream haze",
+  "size": [100, 30],
+  "steps": ["layout dashboard"],
+  "expect": ["energy 30%"],
+  "absent": ["Traceback", "KeyError"]
+ }
+]

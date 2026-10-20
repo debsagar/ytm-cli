@@ -9,6 +9,7 @@ A scenario is a JSON object (or a list of them). Every field is optional:
   pos       seconds into the song; paused: true/false
   theme     a theme name, or a whole theme spec (e.g. a malformed LLM-written one)
   themes    N made-up grown themes added to the library ("grown 01" ...)
+  grown     list of whole theme specs added to the library, as the theme writer would
   feats     what the brain "measured" for the song (energy, mood, tags, ...)
   results   songs that search/radio return
   library   "copy" uses a copy of ~/.ytmdev data; default is an empty library
@@ -17,6 +18,7 @@ A scenario is a JSON object (or a list of them). Every field is optional:
             | {"mpv": {"time-pos": 99}} | {"click": "#id", "times": 2} | {"wait": 0.5}
   expect    strings that must appear on screen at the end
   absent    strings that must NOT appear (e.g. "Traceback", "None")
+  palette   {key: "#rrggbb"} the theme on screen must end up with (after normalize)
 
 Writes OUT/<name>.txt (plain screen text) for each scenario, prints PASS/FAIL,
 exits 1 if anything failed."""
@@ -177,6 +179,8 @@ async def run(sc, out, svg):
             await pilot.pause(0.2)
             if isinstance(theme_in, dict):
                 app.lib.save_theme(theme_in)
+            for t in sc.get("grown", []):
+                app.lib.save_theme(t)
             for i in range(sc.get("themes", 0)):
                 h = f"{(i * 37) % 256:02x}{(i * 91) % 256:02x}{(255 - i * 53) % 256:02x}"
                 app.lib.save_theme({"name": f"grown {i + 1:02}", "for": f"made-up theme {i + 1}", "motif": list(theme.MOTIFS)[i % 16],
@@ -206,6 +210,9 @@ async def run(sc, out, svg):
                 await pilot.pause(step.get("wait", 0.3) if isinstance(step, dict) else 0.3)
             await pilot.pause(0.3)
             text = screen_text(app)
+            for k, v in sc.get("palette", {}).items():
+                if app.theme_spec["palette"].get(k) != v:
+                    errors.append(f"palette {k}: {app.theme_spec['palette'].get(k)} != {v}")
             if svg:
                 app.save_screenshot(f"{name}.svg", str(out))
     except Exception:

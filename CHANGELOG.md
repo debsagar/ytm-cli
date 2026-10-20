@@ -16,6 +16,11 @@ All notable changes to this project are documented here. Versions follow [Semant
 - The song info sits centred beside the album art. The dashboard's controls sit right under the progress bar, the focus layout centres them, and the visualizer is drawn at reduced weight.
 - Empty list tabs say what fills them, centred (e.g. "no history yet · songs you play show up here").
 
+- Jev also measures each new song's pace, brightness and texture (acoustic ↔ electronic); `brain.motion(f)` hands them to the look and the animation, with guesses for songs measured before.
+
+### Changed
+- Grown themes look like they belong with the presets: the theme writer gets a short design system and the song group's pace, brightness and texture, and every theme's colours are nudged to a readable, calm palette (dark bg, text 7:1, accents 3:1, no clashing or neon accent2). Preset colours stay as they were.
+
 ### Fixed
 - A search that starts with a command word ("quit playing games", "save your tears", "p diddy") searches instead of running the command.
 - `set`: suggests the right key for a wrong one, accepts `key = value`, quotes, lists and any case, and never overwrites a `settings.toml` that has a syntax error. Bad values in the file are reported per key instead of silently ignored.

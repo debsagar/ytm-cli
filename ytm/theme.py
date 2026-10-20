@@ -14,6 +14,8 @@ draws from the primitives below, so any spec (even a broken one) renders safely.
   }
 """
 
+import colorsys
+import math
 import re
 import unicodedata
 
@@ -85,13 +87,13 @@ PRESETS = [
     _t("pit wall", "motorsport, racing and speed", {"energy": .8, "mood": {"aggressive": 1}, "tags": ["motorsport", "soundtrack"]},
        "#0d0d10", "#1a1a20", "#ff2d2d", "#ffd400", "#f2f2f2", "#6b6b78", "checkered", "track", "🏎", "LAP {lap}/{laps}  {pos}", layout="hero"),
     _t("dream haze", "dreamy, hazy, psychedelic indie", {"energy": .3, "mood": {"dreamy": 1}, "tags": []},
-       "#1d1730", "#161126", "#c8a2ff", "#ffb3d9", "#efe6ff", "#7f72a3", "stars", "wave"),
+       "#1d1730", "#161126", "#c8a2ff", "#ffb3e0", "#efe6ff", "#7f72a3", "stars", "wave"),
     _t("desi street", "high-energy South Asian rap and hip-hop", {"energy": .75, "mood": {"aggressive": 1}, "tags": ["south_asian"]},
        "#1a1208", "#120c05", "#ff9933", "#19c37d", "#fff3e0", "#8a7458", "zigzag", "dots", layout="hero"),
     _t("desi soul", "soft, emotional South Asian songs", {"energy": .35, "mood": {"melancholic": .5, "romantic": .5}, "tags": ["south_asian"]},
        "#220f14", "#180a0e", "#e8b04b", "#d9466f", "#fbe9dc", "#8d6a6f", "notes", "thin", "◆"),
     _t("dark techno", "dark, heavy, peak-time club music", {"energy": .9, "mood": {"dark": 1}, "tags": ["club"]},
-       "#0a0a0a", "#050505", "#e0e0e0", "#ff1f3d", "#d8d8d8", "#5c5c5c", "grid", "blocks", "", "{pct}%", layout="stage"),
+       "#0a0a0a", "#050505", "#e0e0e0", "#ff1f3d", "#d8d8d8", "#5d5d5d", "grid", "blocks", "", "{pct}%", layout="stage"),
     _t("velvet", "romantic, sensual, slow-burning songs", {"energy": .4, "mood": {"romantic": 1}, "tags": []},
        "#1f0d16", "#16090f", "#ff6f91", "#ffc2d1", "#ffe8ee", "#8f6574", "hearts", "thin", "♥", layout="focus"),
     _t("retro tape", "nostalgic, retro, throwback songs", {"energy": .55, "mood": {"nostalgic": 1}, "tags": []},
@@ -99,7 +101,7 @@ PRESETS = [
     _t("gold rush", "hype rap, swagger and bangers", {"energy": .85, "mood": {"aggressive": 1}, "tags": []},
        "#0f0c06", "#0a0804", "#ffd166", "#ef476f", "#fff6dc", "#857a5c", "flames", "track", "●", layout="hero"),
     _t("campfire", "acoustic, folk and soft singer-songwriter", {"energy": .2, "mood": {"melancholic": .5, "happy": .5}, "tags": []},
-       "#1b2420", "#141b18", "#a6e3a1", "#f9e2af", "#e2efe6", "#6f8577", "leaves", "dots", layout="focus"),
+       "#1b2420", "#141b18", "#a6e3a1", "#f9f3af", "#e2efe6", "#6f8577", "leaves", "dots", layout="focus"),
     _t("cinema", "film and game soundtracks, epic and dramatic", {"energy": .6, "mood": {"dark": .5, "euphoric": .5}, "tags": ["soundtrack"]},
        "#0b1020", "#070b17", "#4ea8de", "#ffd166", "#e8eefc", "#5f6b8a", "dots", "thin", "◆", layout="hero"),
     _t("sunny day", "happy, upbeat, feel-good pop", {"energy": .65, "mood": {"happy": 1}, "tags": []},
@@ -120,11 +122,90 @@ def _mix(a, b, t):
     return "#" + "".join(f"{round(x + (y - x) * t):02x}" for x, y in zip(ca, cb))
 
 
+def _lum(c):
+    """WCAG relative luminance of #rrggbb."""
+    ch = [int(c[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    r, g, b = [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in ch]
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def contrast(a, b):
+    """WCAG contrast ratio, 1..21."""
+    la, lb = sorted((_lum(a), _lum(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+
+
+def _hls(c):
+    return colorsys.rgb_to_hls(*[int(c[i:i + 2], 16) / 255 for i in (1, 3, 5)])
+
+
+def _rgb(h, light, sat):
+    return "#" + "".join(f"{round(x * 255):02x}" for x in colorsys.hls_to_rgb(h % 1, light, sat))
+
+
+def _lighten(c, bg, ratio):
+    """c made lighter in small steps, hue kept, until it reads at `ratio` on bg."""
+    h, light, sat = _hls(c)
+    while contrast(c, bg) < ratio and light < 1:
+        light = min(1.0, light + 0.03)
+        c = _rgb(h, light, sat)
+    return c
+
+
+def _harmonise(a, b):
+    """(accent, accent2) as one vivid colour and a calmer partner. accent gets lightness >= 0.55;
+    a hue gap of 60..120 degrees (the clashing zone between analogous and split-complementary) snaps
+    to the nearer edge; accent2's chroma stays within 0.2 of accent's. Grey accents (a monochrome
+    theme like dark techno) leave accent2 alone."""
+    ha, la, sa = _hls(a)
+    if la < 0.54:  # the margins here and below keep a second pass from nudging rounded colours again
+        la, a = 0.55, _rgb(ha, 0.55, sa)
+    hb, lb, sb = _hls(b)
+    if sa < 0.15 or sb < 0.15:
+        return a, b
+    gap = (hb - ha + 0.5) % 1 - 0.5  # signed, -0.5..0.5 turns
+    if 62 / 360 < abs(gap) < 118 / 360:
+        hb = ha + (1 / 6 if abs(gap) < 0.25 else 1 / 3) * (1 if gap > 0 else -1)
+    chroma = lambda light, sat: sat * (1 - abs(2 * light - 1))
+    cap = chroma(la, sa) + 0.2
+    if chroma(lb, sb) > cap + 0.02:
+        sb = cap / (1 - abs(2 * lb - 1))
+    return a, _rgb(hb, lb, sb) if (hb, sb) != _hls(b)[::2] else b
+
+
+def readable(p):
+    """The palette's design rules, enforced by nudging colours rather than rejecting the theme:
+    dark bg, panel a shade off bg, text >= 7:1 on bg, accents >= 3:1, dim >= 3:1 yet clearly
+    darker than text. The presets already pass and come out unchanged."""
+    for _ in range(4):  # one fix can undo another (lightening raises chroma): repeat until settled
+        q = _readable_once(p)
+        if q == p:
+            break
+        p = q
+    return p
+
+
+def _readable_once(p):
+    p = dict(p)
+    while _lum(p["bg"]) > 0.02:
+        p["bg"] = _mix(p["bg"], "#000000", 0.1)
+    far = math.dist(*([int(c[i:i + 2], 16) for i in (1, 3, 5)] for c in (p["bg"], p["panel"])))
+    if far > 28:  # a panel far from bg (in any hue) splits the screen in two; presets are <= 25 apart
+        p["panel"] = _mix(p["bg"], p["panel"], 20 / far)
+    p["text"] = _lighten(p["text"], p["bg"], 7)
+    a, b = _harmonise(p["accent"], p["accent2"])
+    p["accent"], p["accent2"] = _lighten(a, p["bg"], 3), _lighten(b, p["bg"], 3)
+    if contrast(p["dim"], p["bg"]) * 1.6 > contrast(p["text"], p["bg"]):  # dim as bright as text: rebuild it between the two
+        p["dim"] = _mix(p["text"], p["bg"], 0.55)
+    p["dim"] = _lighten(p["dim"], p["bg"], 3)
+    return p
+
+
 def normalize(spec):
     """Return a complete, safe theme: unknown or missing fields fall back to the default."""
     spec = spec if isinstance(spec, dict) else {}
     pal_in = spec.get("palette") if isinstance(spec.get("palette"), dict) else {}
-    palette = {k: _hex(pal_in.get(k), v) for k, v in DEFAULT["palette"].items()}
+    palette = readable({k: _hex(pal_in.get(k), v) for k, v in DEFAULT["palette"].items()})
     prog_in = spec.get("progress") if isinstance(spec.get("progress"), dict) else {}
     style = prog_in.get("style") if prog_in.get("style") in PROGRESS else "line"
     return {
