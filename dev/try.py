@@ -5,9 +5,10 @@
 A scenario is a JSON object (or a list of them). Every field is optional:
   name      label for the output files
   size      [w, h] terminal size (default [74, 24], the real window)
-  songs     [{id, title, artist, duration, art: true}] playlist; the first one plays
+  songs     [{id, title, artist, duration, art: true, theme}] playlist; the first one plays
   pos       seconds into the song; paused: true/false
   theme     a theme name, or a whole theme spec (e.g. a malformed LLM-written one)
+  themes    N made-up grown themes added to the library ("grown 01" ...)
   feats     what the brain "measured" for the song (energy, mood, tags, ...)
   results   songs that search/radio return
   library   "copy" uses a copy of ~/.ytmdev data; default is an empty library
@@ -40,7 +41,7 @@ from rich.console import Console  # noqa: E402
 from rich.text import Text  # noqa: E402
 
 import ytm.app as A  # noqa: E402
-from ytm import art, brain, library, search, settings  # noqa: E402
+from ytm import art, brain, library, search, settings, theme  # noqa: E402
 from ytm.search import Track  # noqa: E402
 
 DEV_HOME = Path.home() / ".ytmdev"
@@ -153,6 +154,8 @@ async def run(sc, out, svg):
 
     def fake_think(song, lib, llm=True):
         f = dict(feats)
+        if cat.get(song["id"], {}).get("theme"):  # a song can carry its own theme
+            f["theme"] = cat[song["id"]]["theme"]
         if isinstance(theme_in, dict):
             f.setdefault("theme", str(theme_in.get("name") or "untitled"))
         elif theme_in:
@@ -174,6 +177,11 @@ async def run(sc, out, svg):
             await pilot.pause(0.2)
             if isinstance(theme_in, dict):
                 app.lib.save_theme(theme_in)
+            for i in range(sc.get("themes", 0)):
+                h = f"{(i * 37) % 256:02x}{(i * 91) % 256:02x}{(255 - i * 53) % 256:02x}"
+                app.lib.save_theme({"name": f"grown {i + 1:02}", "for": f"made-up theme {i + 1}", "motif": list(theme.MOTIFS)[i % 16],
+                                    "palette": {"bg": "#101018", "panel": "#0b0b12", "accent": f"#{h}", "accent2": f"#{h[4:]}{h[:4]}",
+                                                "text": "#eeeeee", "dim": "#666677"}})
             if isinstance(sc.get("settings"), dict):
                 for k, v in sc["settings"].items():
                     app.settings.set(k, str(v))

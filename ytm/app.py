@@ -1,5 +1,6 @@
 """The terminal UI (Textual): a compact mini-player. Run with:  python -m ytm"""
 
+import difflib
 import math
 import os
 import re
@@ -52,6 +53,7 @@ HELP_ROWS = [
     ("set · set <key> <value>", "see or change settings"),
     ("mode off · jev · yolo", "how much the brain may do"),
     ("layout · layout <name>", "pick one with a preview · ▦ cycles"),
+    ("theme · theme <name>", "pick one with a preview · ◐ cycles"),
     ("vibe · vibe calm|normal|loud", "calm: less decoration, loud: more"),
     ("quit", "exit (Ctrl+Q also works)"),
     ("", ""),
@@ -264,35 +266,46 @@ class PlaylistPicker(ModalScreen):
         self.dismiss(event.value.strip() or None)
 
 
-class LayoutPicker(ModalScreen):
-    """Pick a layout; the highlighted one is previewed behind the popup. Dismisses with a name, or None."""
+def clip(text, n):
+    """text cut to n cells at a word boundary, ending in … when cut."""
+    if len(text) <= n:
+        return text
+    if n < 2:
+        return "…"[:n]
+    head = text[:n - 1]
+    if text[n - 1] != " " and " " in head:  # don't leave half a word
+        head = head.rsplit(" ", 1)[0]
+    return head.rstrip(" ,;·-") + "…"
+
+
+PICKER_W = 120  # the popup's width; a row has PICKER_W - 5 cells (border, padding, scrollbar)
+
+
+class Picker(ModalScreen):
+    """Pick a layout or a theme; the highlighted one is previewed behind the popup. Dismisses with a name, or None."""
     BINDINGS = [Binding("escape", "dismiss(None)")]
     CSS = """
-    LayoutPicker { align: center bottom; background: $ytm-crust 15%; }  /* light: the screen behind is the preview */
-    #lbox { width: 72; max-width: 100%; height: auto; max-height: 100%; background: $ytm-mantle;
+    Picker { align: center middle; background: $ytm-crust 15%; }  /* light: the screen behind is the preview */
+    #lbox { width: 120; max-width: 100%; height: auto;  /* PICKER_W */ max-height: 100%; background: $ytm-mantle;
             border: round $ytm-mauve; padding: 0 1; border-title-color: $ytm-mauve; }
-    #lay { height: auto; background: $ytm-mantle; }
+    #lay { height: auto; max-height: 12; background: $ytm-mantle;  /* 60 themes scroll; the preview stays visible above */
+           scrollbar-size-vertical: 1; scrollbar-color: $ytm-mauve; scrollbar-background: $ytm-mantle; }
     #lay > ListItem { background: $ytm-mantle; }
     #lay > ListItem.-highlight { background: $ytm-s0; }
-    #lay Label { text-wrap: nowrap; text-overflow: ellipsis; }
-    #lhint { color: $ytm-dim; }
+    #lay Label { width: 1fr; text-wrap: nowrap; text-overflow: ellipsis; }
+    #lhint { color: $ytm-dim; text-wrap: nowrap; text-overflow: ellipsis; }
     """
 
-    def __init__(self, rows, current, preview):
-        """rows: (name, description, fits the window); preview(name) shows a layout behind."""
+    def __init__(self, title, rows, current, preview):
+        """rows: (name, label markup, None or why it can't be picked); preview(name) shows it behind."""
         super().__init__()
-        self.rows, self.current, self.preview = rows, current, preview
+        self.title_, self.rows, self.current, self.preview = title, rows, current, preview
 
     def compose(self):
-        items = []
-        for name, desc, fits in self.rows:
-            hi, lo = (C["blue"], C["sub"]) if fits else (C["dim"], C["dim"])
-            mark = "●" if name == self.current else " "
-            need = "" if fits else "needs a bigger window · "
-            items.append(ListItem(Label(f"{mark} [b {hi}]{name:<10}[/][{lo}]{need}{escape(desc)}[/]")))
+        items = [ListItem(Label(f"{'●' if name == self.current else ' '} {label}")) for name, label, _ in self.rows]
         index = next((i for i, r in enumerate(self.rows) if r[0] == self.current), 0)
         with Vertical(id="lbox") as box:
-            box.border_title = "layouts"
+            box.border_title = self.title_
             yield ListView(*items, id="lay", initial_index=index)
             yield Static("↑↓ preview · Enter keeps it · Esc puts yours back", id="lhint")
 
@@ -306,11 +319,11 @@ class LayoutPicker(ModalScreen):
 
     @on(ListView.Selected)
     def chose(self, event):
-        name, _, fits = self.rows[event.list_view.index]
-        if fits:
-            self.dismiss(name)
+        name, _, why = self.rows[event.list_view.index]
+        if why:
+            self.query_one("#lhint").update(f"{escape(why)} · Esc puts yours back")
         else:
-            self.query_one("#lhint").update(f"{name} needs a bigger window ({DASH_MIN[0]}x{DASH_MIN[1]}) · Esc puts yours back")
+            self.dismiss(name)
 
 
 class YtmApp(App):
@@ -455,6 +468,7 @@ class YtmApp(App):
         self.song_feats = {}       # features of the song playing (headline, blurb...)
         self._played = None        # (video id, last position, duration) for skip logging
         self._unplayed = None      # a song loaded paused (resume): not a play until it plays
+        self._back = None          # (theme_spec, vibe) a picker goes back to; None when none is open
         self._picked = set()       # parts of the look the user picked (layout, colours): restyles keep them
         self.layout = "classic"     # the layout on screen (the theme's, if the window fits it)
         self._log = []              # recent messages, shown in the dashboard's ask panel
@@ -669,23 +683,74 @@ class YtmApp(App):
         small = "" if self.layout == name else f" · needs {DASH_MIN[0]}x{DASH_MIN[1]}, showing {self.layout} for now"
         self.say(f"▦ {name}{small}")
 
-    def choose_layout(self):
-        """`layout` alone: a picker that previews each layout; Enter picks it like `layout <name>`."""
-        before = (self.theme_spec, self.vibe)
-
-        def preview(name):
-            fits = self.fits(name)
-            self.theme_spec, self.vibe = ({**before[0], "layout": name}, "normal") if fits else before
-            self.apply_theme()
+    def open_picker(self, title, rows, current, preview, keep):
+        """A Picker that previews behind itself; Enter calls keep(name), Esc puts the look back.
+        While it's open, automatic restyles land in _back instead (see restyle), so they neither
+        clobber the preview nor leave Esc going back to a stale theme."""
+        self._back = (self.theme_spec, self.vibe)
 
         def done(name):
-            self.theme_spec, self.vibe = before
-            if name:
-                self.pick_layout(name)  # logs it, and it sticks
-            else:
-                self.apply_theme()
-        rows = [(n, d, self.fits(n)) for n, d in theme.LAYOUTS.items()]
-        self.push_screen(LayoutPicker(rows, self.layout, preview), done)
+            (self.theme_spec, self.vibe), self._back = self._back, None
+            keep(name) if name else self.apply_theme()
+        self.push_screen(Picker(title, rows, current, preview), done)
+
+    def choose_layout(self):
+        """`layout` alone: a picker that previews each layout; Enter picks it like `layout <name>`."""
+        def preview(name):
+            spec, vibe = self._back
+            self.theme_spec, self.vibe = ({**spec, "layout": name}, "normal") if self.fits(name) else (spec, vibe)
+            self.apply_theme()
+        rows, room = [], min(PICKER_W, self.size.width) - 5 - 12
+        for n, d in theme.LAYOUTS.items():
+            fits = self.fits(n)
+            hi, lo = (C["blue"], C["sub"]) if fits else (C["dim"], C["dim"])
+            need = "" if fits else "needs a bigger window · "
+            rows.append((n, f"[b {hi}]{n:<10}[/][{lo}]{escape(clip(need + d, room))}[/]",
+                         None if fits else f"{n} needs a bigger window ({DASH_MIN[0]}x{DASH_MIN[1]})"))
+        self.open_picker("layouts", rows, self.layout, preview, self.pick_layout)  # pick_layout logs it, and it sticks
+
+    def pick_theme(self, name):
+        """A theme picked by hand (◐, `theme <name>`, the picker): it sticks for the session."""
+        self.restyle(self.theme_named(name), manual=True)
+        self._picked |= {"colours", "motif"}  # the theme you see is the one you picked
+        self.lib.log("theme_cycle", self.current_id() or "", to=name)
+        self.say(f"◐ {escape(name)}")
+
+    def theme_command(self, arg, line):
+        """`theme`/`themes` alone: the picker. `theme <name>`: that theme, a did-you-mean, or a search."""
+        names = [t["name"] for t in brain.all_themes(self.lib)]
+        if not arg:
+            return self.choose_theme()
+        exact = next((n for n in names if n.lower() == arg.lower()), None)
+        close = difflib.get_close_matches(arg.lower(), [n.lower() for n in names], 1)
+        if exact:
+            self.pick_theme(exact)
+        elif close:
+            self.say(f"no theme {escape(arg)} · did you mean {escape(next(n for n in names if n.lower() == close[0]))}? · theme lists them")
+        else:
+            self.do_search(line, "search")  # "theme from shaft" is a song
+
+    def choose_theme(self):
+        """`theme` alone: every theme with a colour swatch and its motif; the highlighted one is previewed."""
+        specs = {}
+        for t in brain.all_themes(self.lib):
+            specs.setdefault(t["name"], t)  # first one wins, like theme_named
+
+        def preview(name):
+            self.theme_spec = self.styled(specs[name], manual=True)  # exactly what Enter would show
+            self.apply_theme()
+
+        room = min(PICKER_W, self.size.width) - 5 - 52  # 52: mark, swatch, name, motif, layout
+
+        def row(name, t):
+            t = theme.normalize(t)
+            p = t["palette"]
+            chip = "".join(f"[{p[k]}]██[/]" for k in ("bg", "panel", "accent", "accent2", "text"))
+            motif = theme.motif_line(t, 8) or "        "
+            return (f"{chip} [b {p['accent']} on {p['bg']}] {escape(f"{clip(name, 18):<18}")} [/]"
+                    f"[{p['accent2']} on {p['bg']}]{escape(motif)} [/] [{C['sub']}]{t['layout']:<9}[/][{C['dim']}]{escape(clip(t['for'], room))}[/]", None)
+        rows = [(n, *row(n, t)) for n, t in specs.items()]
+        self.open_picker(f"themes · {len(rows)}", rows, self.theme_spec["name"], preview, self.pick_theme)
 
     def set_vibe(self, vibe=None):
         """Instant control: calm strips decoration, loud adds it."""
@@ -744,30 +809,44 @@ class YtmApp(App):
     def keep_look(self, feats):
         """Why the current look stays (the restyle schedule, or stickiness), or None to switch."""
         s = self.settings
-        if feats["theme"] == self.theme_spec["name"]:
+        now = self.look()["name"]
+        if feats["theme"] == now:
             return None
         if not settings.restyle_due(s["restyle"], self._songs_since, time.time() - self._restyled_at):
             return s["restyle"]
-        cur = next((t for t in brain.all_themes(self.lib) if t["name"] == self.theme_spec["name"]), None)
+        cur = next((t for t in brain.all_themes(self.lib) if t["name"] == now), None)
         if cur:  # hysteresis: the new theme must fit clearly better, not just slightly
             gain = math.dist(brain.song_vec(feats), brain.theme_vec(cur)) - feats["dist"]
             if gain < s["stickiness"] * brain.STICKY:
                 return "sticky"
         return None
 
-    def restyle(self, spec, manual=False):
-        """Switch to a theme, changing only the parts the can_change setting allows
-        and, unless the user is the one switching, none they picked this session."""
-        new, cur = theme.normalize(spec), self.theme_spec
-        allowed = [x for x in self.settings["can_change"] if manual or x not in self._picked]
+    def look(self):
+        """The theme in force: while a picker previews, the one it will go back to."""
+        return self._back[0] if self._back else self.theme_spec
+
+    def styled(self, spec, manual=False):
+        """A theme as it would land: only the parts the can_change setting allows
+        and none they picked this session (a manual theme pick may replace picked colours and motif)."""
+        new, cur = theme.normalize(spec), self.look()
+        allowed = [x for x in self.settings["can_change"]
+                   if x not in self._picked or (manual and x != "layout")]  # a theme pick keeps a layout picked by hand
         if "colours" not in allowed:
             new["palette"] = cur["palette"]
         if "motif" not in allowed:
             new["motif"], new["progress"] = cur["motif"], cur["progress"]
         if "layout" not in allowed:
             new["layout"] = cur["layout"]
+        return new
+
+    def restyle(self, spec, manual=False):
+        """Switch to a theme (see styled)."""
+        new = self.styled(spec, manual)
         self._songs_since, self._restyled_at = 0, time.time()
-        self.apply_theme(new)
+        if self._back:  # a picker is previewing: this is what Esc goes back to
+            self._back = (new, self._back[1])
+        else:
+            self.apply_theme(new)
 
     def song_changed(self):
         """Log the play/skip of the previous song, then theme the new one."""
@@ -1199,6 +1278,8 @@ class YtmApp(App):
                 self.cost_report()
             elif cmd == "layout":
                 self.pick_layout(arg.lower()) if arg else self.choose_layout()
+            elif cmd in ("theme", "themes"):
+                self.theme_command(arg, line)
             elif cmd == "vibe":
                 self.set_vibe(arg.lower() or None)
             elif cmd in ("help", "?"):
@@ -1237,11 +1318,7 @@ class YtmApp(App):
         elif bid == "theme":  # instant: cycle through every theme in the library
             names = [t["name"] for t in brain.all_themes(self.lib)]
             cur = self.theme_spec["name"]
-            nxt = names[(names.index(cur) + 1) % len(names)] if cur in names else names[0]
-            self.restyle(self.theme_named(nxt), manual=True)
-            self._picked.add("colours")
-            self.lib.log("theme_cycle", self.current_id() or "", to=nxt)
-            self.say(f"◐ {escape(nxt)}")
+            self.pick_theme(names[(names.index(cur) + 1) % len(names)] if cur in names else names[0])
         elif bid == "layout":  # instant: next layout that fits the window
             self.pick_layout()
         elif bid == "like_now":
@@ -1312,7 +1389,7 @@ class YtmApp(App):
         self.show(names[(names.index(cur) + step) % len(names)])
 
     def action_help(self):
-        if not isinstance(self.screen, (HelpScreen, PlaylistPicker, LayoutPicker)):
+        if not isinstance(self.screen, (HelpScreen, PlaylistPicker, Picker)):
             self.push_screen(HelpScreen())
 
     # ---- hotkeys ----

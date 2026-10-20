@@ -140,6 +140,7 @@ Sources: git history, CHANGELOG, README, `dev/README.md`, `docs/context.md`, the
 | D81 | 2026-10-19 | model | Use cheaper models for chores (Sonnet, Haiku) and Opus for design-heavy work | Cost | active |
 | D82 | 2026-10-19 | human | Keep a decisions log (this file) and a flow-of-execution doc (`docs/flow.md`), check the plan's priors, and clean up redundant code | Asked for alongside the playground build order | active |
 | D83 | 2026-10-19 | human | `main` is stable and `dev` gets new features first; `ytm update dev` switches a copy to dev, `ytm update stable` goes back | "Add one option to go back to a stable release. Mark main as stable." The user runs dev on the real install and needs a way back if it breaks | active |
+| D84 | 2026-10-20 | human | `theme` opens a picker like `layout`'s: one shared `Picker` popup, centred, rows with a colour swatch and motif, live preview, Enter is a manual pick, Esc goes back. Automatic restyles while it is open are held, so they neither clobber the preview nor leave Esc on a stale theme. Rows are cut at a word with … | "when i type layout or themes i should be able to have a list which i can pick from"; the first screenshot was off-centre and cut descriptions mid-word | active |
 
 ---
 

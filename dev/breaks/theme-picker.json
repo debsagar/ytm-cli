@@ -1,0 +1,390 @@
+[
+ {
+  "name": "theme-picker-previews",
+  "why": "Bare `theme` searched YouTube for the word 'theme' and nothing listed the themes. `theme` opens a picker with every theme (13 presets in an empty library), each with a colour swatch and its motif; the highlighted one is previewed behind it (dream haze: its stars motif replaces neon rave's blocks). Descriptions that don't fit are cut at a word and end in … (they used to stop mid-word).",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   74,
+   30
+  ],
+  "steps": [
+   "theme",
+   {
+    "key": "down"
+   },
+   {
+    "key": "down"
+   }
+  ],
+  "expect": [
+   "themes · 13",
+   "● ██████████  neon rave",
+   "✦ · ✧ · ✦ · ✧",
+   "euphoric club…"
+  ],
+  "absent": [
+   "▁▂▃▅▇▅▃▂▁▂▃▅"
+  ]
+ },
+ {
+  "name": "theme-picker-esc",
+  "why": "Esc closes the picker and puts the theme you had back (neon rave's blocks motif).",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   74,
+   30
+  ],
+  "steps": [
+   "theme",
+   {
+    "key": "down"
+   },
+   {
+    "key": "down"
+   },
+   {
+    "key": "escape"
+   }
+  ],
+  "expect": [
+   "▁▂▃▅▇▅▃▂▁▂▃▅"
+  ],
+  "absent": [
+   "themes ·",
+   "✦ · ✧ · ✦ · ✧"
+  ]
+ },
+ {
+  "name": "theme-picker-enter-sticks",
+  "why": "Enter keeps the highlighted theme like ◐ (a manual pick), so the next song's automatic restyle keeps its colours and motif.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   },
+   {
+    "id": "bbbbbbbbbbb",
+    "title": "Two",
+    "artist": "B"
+   }
+  ],
+  "size": [
+   74,
+   30
+  ],
+  "steps": [
+   "themes",
+   {
+    "key": "down"
+   },
+   {
+    "key": "down"
+   },
+   {
+    "key": "enter"
+   },
+   {
+    "key": "ctrl+n",
+    "wait": 1
+   }
+  ],
+  "expect": [
+   "✦ · ✧ · ✦ · ✧"
+  ],
+  "absent": [
+   "themes ·",
+   "▁▂▃▅▇▅▃▂▁▂▃▅"
+  ]
+ },
+ {
+  "name": "theme-named",
+  "why": "`theme <name>` picks a theme directly, ignoring case.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "theme Velvet"
+  ],
+  "expect": [
+   "◐ velvet"
+  ]
+ },
+ {
+  "name": "theme-named-typo",
+  "why": "A near-miss name suggests the real one instead of searching.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "theme velvt"
+  ],
+  "expect": [
+   "no theme velvt · did you mean velvet?"
+  ]
+ },
+ {
+  "name": "theme-named-song",
+  "why": "`theme from shaft` is a song, not a theme: no theme is close, so it searches.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "steps": [
+   "theme from shaft"
+  ],
+  "absent": [
+   "no theme"
+  ],
+  "expect": [
+   "no results for theme from shaft"
+  ]
+ },
+ {
+  "name": "theme-picker-brackets",
+  "why": "An LLM-written theme name with [brackets] shows literally in the picker instead of being read as markup (or crashing). (Cut at a word with … at 74 wide.)",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "theme": {
+   "name": "[b]lo-fi [x]",
+   "for": "[red]rainy[/] beats",
+   "palette": {
+    "bg": "#101010",
+    "accent": "#88ccff"
+   },
+   "motif": "rain"
+  },
+  "steps": [
+   "theme"
+  ],
+  "expect": [
+   "[b]lo-fi [x]",
+   "[red]rainy[/]…",
+   "themes · 14"
+  ]
+ },
+ {
+  "name": "theme-picker-60",
+  "why": "With 73 themes the list scrolls inside the popup (capped at 12 rows so the preview stays visible) and End reaches the last one.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "themes": 60,
+  "size": [
+   74,
+   30
+  ],
+  "steps": [
+   "theme",
+   {
+    "key": "end"
+   }
+  ],
+  "expect": [
+   "themes · 73",
+   "grown 60",
+   "Esc puts yours back"
+  ],
+  "absent": [
+   "neon rave "
+  ]
+ },
+ {
+  "name": "theme-picker-song-change",
+  "why": "A song change while the picker is open used to restyle under it: the automatic restyle (velvet → cinema) is held, so the previewed theme (retro tape, classic) stays on screen.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A",
+    "theme": "velvet"
+   },
+   {
+    "id": "bbbbbbbbbbb",
+    "title": "Two",
+    "artist": "B",
+    "theme": "cinema"
+   }
+  ],
+  "size": [
+   74,
+   30
+  ],
+  "steps": [
+   "theme",
+   {
+    "key": "down"
+   },
+   {
+    "key": "ctrl+n",
+    "wait": 1
+   }
+  ],
+  "expect": [
+   "◉ ○ ◉ ○ ◉ ○",
+   "themes ·"
+  ]
+ },
+ {
+  "name": "theme-picker-song-change-esc",
+  "why": "…and Esc then goes to the new song's theme (cinema, hero layout), not the stale one from when the picker opened (velvet, focus).",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A",
+    "theme": "velvet"
+   },
+   {
+    "id": "bbbbbbbbbbb",
+    "title": "Two",
+    "artist": "B",
+    "theme": "cinema"
+   }
+  ],
+  "size": [
+   74,
+   30
+  ],
+  "steps": [
+   "theme",
+   {
+    "key": "down"
+   },
+   {
+    "key": "ctrl+n",
+    "wait": 1
+   },
+   {
+    "key": "escape"
+   }
+  ],
+  "expect": [
+   "T W O"
+  ],
+  "absent": [
+   "themes ·",
+   "♥ ♡ ♥ ♡"
+  ]
+ },
+ {
+  "name": "theme-picker-tiny-window",
+  "why": "In a 40x12 window the picker still opens, fits, and truncates rows instead of wrapping.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   40,
+   12
+  ],
+  "steps": [
+   "theme",
+   {
+    "key": "down"
+   }
+  ],
+  "expect": [
+   "themes · 13"
+  ],
+  "absent": [
+   "Traceback"
+  ]
+ },
+ {
+  "name": "layout-picker-clip",
+  "why": "In a small window the layout picker cuts descriptions at a word boundary with … instead of mid-word.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   60,
+   24
+  ],
+  "steps": [
+   "layout"
+  ],
+  "expect": [
+   "layouts",
+   "spaced-out title…",
+   "needs a bigger window · four panels:…"
+  ],
+  "absent": [
+   "Traceback"
+  ]
+ },
+ {
+  "name": "theme-picker-keeps-picked-layout",
+  "why": "Picking a theme by hand replaced a layout picked by hand (dashboard became the theme's stage). A theme pick changes colours and motif; a hand-picked layout stays.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   74,
+   30
+  ],
+  "steps": [
+   "layout focus",
+   "theme",
+   {
+    "key": "down"
+   },
+   {
+    "key": "down"
+   },
+   {
+    "key": "enter"
+   }
+  ],
+  "expect": [
+   "✦ · ✧ · ✦ · ✧"
+  ],
+  "absent": [
+   "library",
+   "themes ·"
+  ]
+ }
+]
