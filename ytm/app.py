@@ -17,7 +17,7 @@ from textual.containers import Container, Horizontal, Vertical, VerticalScroll  
 from textual.screen import ModalScreen  # noqa: E402
 from textual.widgets import Button, Input, Label, ListItem, ListView, Static  # noqa: E402
 
-from . import art, brain, context, library, search, settings, theme  # noqa: E402
+from . import art, brain, context, library, pixel, search, settings, theme  # noqa: E402
 from .player import Player  # noqa: E402
 from .search import VID_RE, Track  # noqa: E402
 
@@ -361,11 +361,11 @@ class YtmApp(App):
 
     #now {{ height: auto; }}
     Screen.art #info {{ height: 100%; align-vertical: middle; }}  /* the song sits centred beside the art, not stuck to its top */
-    #art {{ width: {ART_W}; height: {ART_H}; margin-right: 2; color: $ytm-s1; }}
+    #art {{ width: {ART_W}; height: {ART_H}; margin-right: 2; }}
     #info {{ height: auto; }}
     #title {{ color: $ytm-pink; text-style: bold; }}
     #motif {{ color: $ytm-mauve; height: 1; }}
-    #eq {{ color: $ytm-mauve; height: 3; display: none; }}
+    #eq {{ height: 3; display: none; }}
     Screen.layout-stage #eq {{ display: block; }}
     Screen.layout-hero.tall #art {{ width: {ART_W * 2}; height: {ART_H * 2}; margin-right: 3; }}
     Screen.layout-hero #title {{ margin-top: 1; }}
@@ -389,7 +389,7 @@ class YtmApp(App):
     Screen.layout-dashboard #msg {{ height: auto; text-wrap: wrap; }}  /* the ask panel is narrow: wrap, the log above shrinks */
     Screen.layout-dashboard #motif {{ display: none; }}
     Screen.layout-dashboard #controls {{ layout: vertical; height: 2; }}
-    #viz_eq {{ height: 1fr; color: $ytm-mauve 40%; }}  /* light: decoration, not the main thing */
+    #viz_eq {{ height: 1fr; }}
     #motif, #eq, #viz_eq, #bar {{ text-wrap: nowrap; }}  /* drawn to width every frame: skip the wrapping pass */
     #viz_cap {{ height: 1; color: $ytm-dim; text-wrap: nowrap; text-overflow: ellipsis; }}
     Screen.layout-focus #title {{ text-align: center; }}
@@ -442,6 +442,11 @@ class YtmApp(App):
 
     /* mini: one song line and a thin bar, above the prompt (F2, or automatic on a tiny window) */
     #mini {{ display: none; height: 2; padding: 0 2; margin: 1 0 0 0; }}
+    #mini_line {{ width: 1fr; height: 2; }}
+    #mini_sprite {{ display: none; width: 16; height: 4; margin-right: 2; }}
+    Screen.sprite #mini {{ height: 4; }}
+    Screen.sprite #mini_line {{ margin: 1 0 0 0; }}  /* centred beside the cassette */
+    Screen.sprite #mini_sprite {{ display: block; }}
     Screen.mini #mini {{ display: block; }}
     Screen.tight #mini {{ margin: 0; }}
     Screen.mini-only #left, Screen.mini-only #footer {{ display: none; }}
@@ -505,7 +510,9 @@ class YtmApp(App):
         self._frame_at = None       # when the last animation frame was drawn (monotonic)
         self._anim = None           # the animation timer, running only while something moves
         self._anim_rate = None      # its interval in seconds
-        self._levels = {"eq": [], "viz_eq": []}  # equaliser bar heights, eased frame to frame
+        self._bars = {"eq": pixel.Bars(), "viz_eq": pixel.Bars()}  # equaliser state, eased frame to frame
+        self._cover = False         # a real cover is on #art; otherwise a generated scene is
+        self._scene = (None, None, None)  # (what it was built for, pixel.Scene, time of its last frame)
         self._shown = {}            # widget id -> text last drawn there (skip identical updates)
         self._vibed = (None, None, None)  # (theme_spec, vibe, theme with the vibe applied)
         self._cid = False           # current video id, cached (False: look it up again)
@@ -515,7 +522,9 @@ class YtmApp(App):
         self._focus_back = None     # what had focus before mini mode, given back after
 
     def compose(self) -> ComposeResult:
-        yield Static(id="mini")  # shown in mini mode instead of the panels above the prompt
+        with Horizontal(id="mini"):  # shown in mini mode instead of the panels above the prompt
+            yield Static(id="mini_sprite")  # a turning cassette, when the window has the rows
+            yield Static(id="mini_line")
         # Two columns: side by side in the dashboard, stacked (player, library, ask) otherwise.
         with Container(id="body"):
             with Vertical(id="left"):
@@ -572,7 +581,7 @@ class YtmApp(App):
         self.render_now()
         self.render_controls()
         self.apply_layout()
-        self.query_one("#art").update(self.empty_art())
+        self.draw_art()
         self.set_interval(1, self.tick)
         self.query_one("#prompt").focus()
         vibe = context.usual_vibe(self.lib)  # the vibe you usually settle on at this time of day
@@ -764,6 +773,10 @@ class YtmApp(App):
             self.main.set_class(self.mini or auto, "mini")
             self.call_after_refresh(self.render_now)  # its width is known once it's shown
         self.main.set_class(self.mini or (auto and self.size.height < 8), "mini-only")  # no room for the footer either
+        sprite = self.mini and self.size.height >= 8 and self.size.width >= 40  # 4 rows + the ask panel's 4
+        if self.main.has_class("sprite") != sprite:
+            self.main.set_class(sprite, "sprite")
+            self.call_after_refresh(self.render_now)  # the mini line got narrower or wider
         if self.mini:
             return
         if new := [p for p in PANELS if p in panels(want) - shown - self._noted]:  # once a session per panel
@@ -1007,7 +1020,7 @@ class YtmApp(App):
         """Whether anything that moves is on screen."""
         t = self.vibed
         return bool((theme.MOTIFS.get(t["motif"]) and self.layout != "dashboard") or self.layout == "stage"
-                    or self.query_one("#viz").display
+                    or self.query_one("#viz").display or self.main.has_class("sprite") or self.scene_shown()
                     or (theme.PROGRESS[t["progress"]["style"]][0] == "█" and not t["progress"]["cursor"]))
 
     def animate_when_needed(self):
@@ -1038,16 +1051,19 @@ class YtmApp(App):
         t, f = self.vibed, self.song_feats
         width = self.query_one("#info").content_size.width
         self.put("motif", escape(theme.motif_line(t, width, int(self._phase * 2))))
-        energy = f.get("energy", 0.5)
-        speed = 0.5 + f.get("pace", energy)  # slow songs sway slowly
+        m, pal = brain.motion(f), pixel.palette(t)
         if self.layout == "stage":
-            self.put("eq", theme.equaliser(width, 3, self._phase * speed, energy, self._levels["eq"], dt))
+            self.put("eq", self._bars["eq"].frame(width, 3, self._phase, m, pal, dt))
         if self.query_one("#viz").display:
             eq = self.query_one("#viz_eq")
-            self.put("viz_eq", theme.equaliser(eq.content_size.width, max(1, eq.content_size.height),
-                                               self._phase * speed, energy, self._levels["viz_eq"], dt))
-            cap = [t["name"], f.get("mood"), f.get("energy") is not None and f"energy {int(energy * 100)}%"]
+            self.put("viz_eq", self._bars["viz_eq"].frame(eq.content_size.width, max(1, eq.content_size.height),
+                                                          self._phase, m, pal, dt))
+            cap = [t["name"], f.get("mood"), f.get("energy") is not None and f"energy {int(m['energy'] * 100)}%"]
             self.put("viz_cap", escape(" · ".join(x for x in cap if x)))
+        if self.main.has_class("sprite"):
+            step = int(self._phase * (1 + 3 * m["pace"])) % 4  # 1-4 steps a second: faster for faster songs, still calm
+            self.put("mini_sprite", pixel.sprite(step, tuple(t["palette"].items()), t["motif"] == "vinyl"))
+        self.draw_art()
         self.render_bar()
 
     # ---- the song that's playing ----
@@ -1075,23 +1091,52 @@ class YtmApp(App):
         return self.known.get(vid) or Track(vid, self.state["media-title"] or "")
 
     # ---- drawing ----
-    def empty_art(self):
-        return "\n".join(["░" * ART_W] * ART_H)
+    def art_size(self):
+        big = self.layout == "hero" and self.main.has_class("tall")
+        return ART_W * (2 if big else 1), ART_H * (2 if big else 1)
 
     def update_art(self):
+        """A new song (or size): its scene until the cover arrives. No song: the scene again."""
         vid = self.current_id()
         if not vid:
             self._art_id = None  # queue ended: playing the same song again is a new song (song_changed)
+            self._cover = False
         elif vid != self._art_id:
             self._art_id = vid
-            self.load_art(vid)
+            self._cover = False
+            self.load_art(vid, *self.art_size())
+        self.draw_art()
+        self.animate_when_needed()  # a scene moves, a cover doesn't
 
     @work(thread=True, exclusive=True, group="art")
-    def load_art(self, vid):
-        big = self.layout == "hero" and self.main.has_class("tall")
-        img = art.fetch(vid, ART_W * (2 if big else 1), ART_H * (2 if big else 1))
+    def load_art(self, vid, w, h):
+        img = art.fetch(vid, w, h)
         if img is not None and vid == self._art_id:
-            self.call_from_thread(self.query_one("#art").update, img)
+            self.call_from_thread(self.show_cover, img)
+
+    def show_cover(self, img):
+        self._cover = True
+        self._scene = (*self._scene[:2], None)  # the scene draws again when the cover goes
+        self.put("art", img, True)
+        self.animate_when_needed()
+
+    def scene_shown(self):
+        return not self._cover and self.query_one("#player").display and self.query_one("#art").styles.display != "none"
+
+    def draw_art(self):
+        """The mood scene in #art while there's no cover. Built when the song, its mood, the size or
+        the colours change; redrawn at most 4 times a second (its motion is slow)."""
+        if not self.scene_shown():
+            return
+        (w, h), t = self.art_size(), self.vibed
+        key = (self._art_id, pixel.scene_for({**self.song_feats, **brain.motion(self.song_feats)}), w, h,
+               tuple(t["palette"].values()))
+        q = int(self._phase * 4) / 4
+        if self._scene[0] != key:
+            self._scene = (key, pixel.Scene(key[1], key[0], w, h, pixel.palette(t)), None)
+        if self._scene[2] != q:
+            self._scene = (*self._scene[:2], q)
+            self.put("art", self._scene[1].frame(q))
 
     def render_now(self):
         s = self.state
@@ -1126,8 +1171,10 @@ class YtmApp(App):
 
     def render_mini(self, title, artist, pos, dur):
         """Mini mode: ▶ title · artist and the time on one line, a thin bar under it."""
-        w = self.query_one("#mini").content_size.width
+        w = self.query_one("#mini_line").content_size.width
         if w < 10:
+            if self.main.has_class("mini"):  # just shown: its width settles a frame or two later
+                self.set_timer(0.05, self.render_now)
             return  # hidden
         when = f"{theme.fmt(pos)} / {theme.fmt(dur)}" if dur else ""
         room = w - 3 - len(when) - 2
@@ -1135,7 +1182,7 @@ class YtmApp(App):
         by = clip(f" · {artist}", room - len(name)) if artist and room - len(name) > 4 else ""
         gap = " " * max(1, w - 3 - len(name) - len(by) - len(when))
         n = round(w * theme._clamp(pos, dur) / dur) if dur else 0
-        self.query_one("#mini").update(
+        self.query_one("#mini_line").update(
             f"[b {C['mauve']}]{'⏸' if self.state['pause'] else '▶'}[/]  [b {C['pink']}]{escape(name)}[/][{C['sub']}]{escape(by)}[/]"
             f"{gap}[{C['dim']}]{when}[/]\n[{C['mauve']}]{'━' * n}[/][{C['s1']}]{'─' * (w - n)}[/]")
 

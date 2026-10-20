@@ -20,13 +20,14 @@
  },
  {
   "name": "motion-equaliser-bars-have-gaps",
-  "why": "The equaliser draws one-cell bars with a gap between, never a solid block.",
+  "why": "The equaliser draws one-cell half-block bars with a gap between, never a solid block (24 rows: no art beside it).",
   "theme": {"name": "eq test", "layout": "stage", "motif": "none", "progress": {"style": "line"}},
   "feats": {"energy": 1.0},
-  "size": [100, 30],
+  "size": [100, 24],
   "songs": [{"id": "aaaaaaaaaaa", "title": "Song", "artist": "A"}],
   "steps": [{"wait": 0.5}],
-  "absent": ["██", "▇█", "█▇"]
+  "expect": ["█ █ █ █"],
+  "absent": ["██", "▀▀", "▄▄"]
  },
  {
   "name": "motion-progress-head-eighths",

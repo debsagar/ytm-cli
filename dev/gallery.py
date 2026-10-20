@@ -26,7 +26,7 @@ from textual.containers import Container, Horizontal, Vertical  # noqa: E402
 from textual.widget import Widget  # noqa: E402
 from textual.widgets import Input, Label, ListItem, ListView, Static  # noqa: E402
 
-from ytm import theme  # noqa: E402
+from ytm import pixel, theme  # noqa: E402
 from ytm.app import TABS, Btn, keys  # noqa: E402
 
 _spec = importlib.util.spec_from_file_location("ytm_try", REPO / "dev" / "try.py")
@@ -137,7 +137,7 @@ def w_prompt(b):
 
 def w_viz(b):
     c = b.c
-    return [Draw(lambda w, h: f"[{c['mauve']}]{theme.equaliser(w, max(1, h), 1.3, 0.8)}[/]"),
+    return [Draw(lambda w, h: pixel.Bars().frame(w, max(1, h), 1.3, {"energy": 0.8, "pace": 0.8}, pixel.palette(b.t), 0)),
             Static(f"[{c['dim']}]{b.t['name']} · euphoric · energy 80%[/]", classes="cap")]
 
 

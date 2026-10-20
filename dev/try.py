@@ -9,6 +9,7 @@ A scenario is a JSON object (or a list of them). Every field is optional:
   name      label for the output files
   size      [w, h] terminal size (default [74, 24], the real window)
   songs     [{id, title, artist, duration, art: true, theme}] playlist; the first one plays
+            (art: true gives it a stand-in cover; without, it has none and shows its mood scene)
   pos       seconds into the song; paused: true/false
   theme     a theme name, or a whole theme spec (e.g. a malformed LLM-written one)
   themes    N made-up grown themes added to the library ("grown 01" ...)
@@ -128,9 +129,9 @@ class FakePlayer:
 
 
 def fake_art(vid, w, h):
-    """Deterministic coloured block instead of downloading a thumbnail."""
+    """Deterministic coloured block instead of downloading a thumbnail; ▓, so scenarios can tell it from a scene."""
     n = sum(map(ord, vid)) % 200
-    return Text("\n".join(["▀" * w] * h), style=f"rgb({n},{255 - n},120) on rgb(40,{n // 2},90)")
+    return Text("\n".join(["▓" * w] * h), style=f"rgb({n},{255 - n},120) on rgb(40,{n // 2},90)")
 
 
 def screen_text(app):
@@ -174,7 +175,7 @@ async def run(sc, out, svg):
         return f
 
     A.Player = lambda on_change, extra_args=(): FakePlayer(on_change, cat)
-    art.fetch = fake_art
+    art.fetch = lambda vid, w, h: fake_art(vid, w, h) if cat.get(vid, {}).get("art") else None  # else: no cover, the scene shows
     search.search = lambda q, limit=10: [track(s) for s in sc.get("results", [])]
     search.radio = lambda vid, limit=50: [track(s) for s in sc.get("results", [])]
     brain.think, brain.enabled = fake_think, lambda: True

@@ -68,12 +68,12 @@ ytm finds mpv in `C:\Program Files\MPV Player`, a `bin` folder inside the repo, 
 - Every button and tab is clickable: playback, ♥ like, volume, autoplay, and actions for the selected song.
 - Ctrl+Space pause · Ctrl+N next · Ctrl+B previous · Ctrl+←/→ seek
 - Ctrl+↑/↓ volume · Ctrl+L like · Ctrl+R autoplay · Ctrl+T themes · Ctrl+G layouts · F1 help. These work while you type.
-- F2 (or Ctrl+P) pops into mini mode: one song line, a thin bar and the prompt, for a small corner window. F2 again brings everything back. A window too small for the player shows the mini line on its own.
+- F2 (or Ctrl+P) pops into mini mode: one song line, a thin bar and the prompt, for a small corner window, with a little cassette turning beside it when the window is 8 rows or taller. F2 again brings everything back. A window too small for the player shows the mini line on its own.
 - Type `?` for the full help.
 
 ### Themes and layouts
 
-Each song gets a theme: colours, a scrolling motif, a progress-bar style and one of four layouts: **classic** (album art and the song list), **hero** (big art and a spaced-out title), **stage** (an animated equaliser next to the art) or **focus** (just the song, centred). There are 13 built-in themes, such as *neon rave*, *rainy window* and *pit wall*.
+Each song gets a theme: colours, a scrolling motif, a progress-bar style and one of four layouts: **classic** (album art and the song list), **hero** (big art and a spaced-out title), **stage** (an animated equaliser next to the art) or **focus** (just the song, centred). There are 13 built-in themes, such as *neon rave*, *rainy window* and *pit wall*. A song without a cover (or while it downloads) gets a pixel scene that suits its mood, in the theme's colours: a synthwave sun, a moon over water or a campfire. The equaliser and the scenes move slowly and follow `motion` (`full`, `low`, `off`).
 
 | hero | stage |
 |---|---|
@@ -179,7 +179,8 @@ The mini-player (`ytm/` package):
 - `search.py` searches YouTube Music and builds radio mixes with [ytmusicapi](https://github.com/sigma67/ytmusicapi).
 - `library.py` reads play history and keeps likes, playlists, song features, themes and events in SQLite.
 - `art.py` draws album art with half-block characters.
-- `theme.py` holds the theme format, the 13 seed themes, layouts, motifs and the equaliser.
+- `theme.py` holds the theme format, the 13 seed themes, layouts and motifs.
+- `pixel.py` draws pixel art in half blocks from the theme's colours: the equaliser, the mood scenes shown when there's no cover, and the mini player's cassette.
 - `brain.py` asks Jev about songs, assigns themes by nearest cluster centre, and asks the LLM for new ones.
 - `importer.py` implements `ytm import`.
 - `app.py` is the Textual UI.

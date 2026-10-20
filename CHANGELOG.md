@@ -5,6 +5,7 @@ All notable changes to this project are documented here. Versions follow [Semant
 ## [Unreleased]
 
 ### Added
+- Pixel art, all in the theme's colours. The equaliser is drawn in half-block pixels: thin bars, an accent2 → accent gradient, a quick eased rise, a gravity fall and a small cap that holds, then drifts down. A song without a cover gets a pixel scene that suits its mood, seeded by the song so each looks a little different: a synthwave sun over a grid (euphoric, club, high energy), a moon over rippling water (dreamy, melancholic, calm) or a campfire under pines (acoustic). It shows at launch, while the cover downloads, if it can't be fetched, and when the queue ends; it moves slowly (twinkling stars, a drifting grid, ripples, flicker) and follows `motion`. Popped mini mode on a window 8+ rows tall shows a cassette (a vinyl for *retro tape*) turning at the song's pace; paused, it stops.
 - `layout` opens a layout picker: each layout with its description, the current one marked, ones too big for the window dimmed; moving the highlight previews it, Enter keeps it, Esc puts yours back. ▦ still cycles.
 - A small window hides panels instead of squashing them: the visualizer first, then the library, then the player; the prompt never hides. `pin viz` / `unpin viz` (or `set pinned viz library`) keep a panel on a small window and show it in any layout, even classic. Panels come back when the window grows.
 - `theme` (or `themes`) opens a theme picker: every theme with a colour swatch, its motif and layout; moving the highlight previews it, Enter keeps it like ◐, Esc puts yours back. `theme <name>` picks one directly and suggests the closest name for a typo.
@@ -28,6 +29,7 @@ All notable changes to this project are documented here. Versions follow [Semant
 - Dev: `dev/check.py` runs ruff, a history self-check and every scenario in one line; `try.py` runs scenarios in parallel (5 min → 1 min) and can render PNGs (`--png`, `--open`) and mid-scenario frames (`{"shot": ...}`).
 
 ### Fixed
+- When the queue ended, the last song's cover stayed in the art box; now the scene comes back.
 - A search that starts with a command word ("quit playing games", "save your tears", "p diddy") searches instead of running the command.
 - `set`: suggests the right key for a wrong one, accepts `key = value`, quotes, lists and any case, and never overwrites a `settings.toml` that has a syntax error. Bad values in the file are reported per key instead of silently ignored.
 - Replies stay visible for at least 5 s before an automatic note replaces them.

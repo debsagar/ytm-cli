@@ -265,31 +265,6 @@ BARS = " ▁▂▃▄▅▆▇█"
 EIGHTHS = " ▏▎▍▌▋▊▉"  # a cell filled from the left, in eighths
 
 
-def equaliser(width, rows, t, energy, levels=None, dt=0.0):
-    """A decorative equaliser: one-cell bars with a gap between, swaying with time `t` and song
-    energy (0..1). Not real audio analysis: that would mean decoding the stream ourselves.
-    `levels` (a list kept by the caller) makes each bar ease toward its target over `dt` seconds:
-    quick to rise, slow to fall, so frames never jump."""
-    full = rows * 8
-    n = (width + 1) // 2
-    targets = []
-    for x in range(n):
-        wave = (math.sin(x * 0.55 + t * 2.3) + math.sin(x * 0.23 - t * 1.3) + 0.5 * math.sin(x * 1.3 + t * 3.7)) / 2.5
-        targets.append((0.2 + 0.7 * energy) * (0.55 + 0.45 * wave) * full)
-    if levels is None:
-        levels = []
-    if len(levels) != n:  # first frame, or a new width: start on target
-        levels[:] = targets
-    for i, goal in enumerate(targets):
-        rate = 14 if goal > levels[i] else 5  # per second
-        levels[i] += (goal - levels[i]) * (1 - math.exp(-rate * dt))
-    cells = [max(1, min(full, round(lv))) for lv in levels]
-    lines = []
-    for r in range(rows - 1, -1, -1):  # top row first
-        lines.append(" ".join(BARS[max(0, min(8, lv - r * 8))] for lv in cells)[:width])
-    return "\n".join(lines)
-
-
 def spaced(title):
     """HERO TITLE STYLE: uppercase with letter spacing. Accents stay attached to their letter."""
     chars = []

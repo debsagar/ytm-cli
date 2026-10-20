@@ -41,7 +41,7 @@ on_mount
 ├─ self.player = Player(on_change=self._from_mpv)   spawns hidden mpv, opens 2 pipes, starts the event thread
 ├─ show("history") → fill_list                      the default tab
 ├─ render_now, render_controls, apply_layout
-├─ #art ← empty_art()
+├─ draw_art()                                       #art ← the mood scene (pixel.Scene) until a cover arrives
 ├─ set_interval(1, tick)                            housekeeping (section 3); animate runs on its own timer
 ├─ #prompt.focus()
 ├─ context.usual_vibe(lib) → vibe, apply_theme()    the vibe you usually settle on at this daypart
@@ -59,7 +59,7 @@ on_mount
 | what | where | how often | does |
 |---|---|---|---|
 | tick | `YtmApp.tick` | 1 s | every 2nd tick: mpv check, `Settings.reload` and a footer redraw if settings.toml changed. Every tick: `refit` (`apply_layout`, `render_now` if `#info` changed width); `on_resize` also calls `refit` 0.3 s later |
-| animate | `YtmApp.animate` | 1/12 s | started and stopped by `animate_when_needed` (from `apply_layout`, pause/time-pos, `app_focus`): runs only while playing with something animated on screen; 1 s for `motion=low` or a blurred terminal, none for `off` (one still frame instead). Advances `_phase` by elapsed time, draws `#motif`, `#eq` (stage), `#viz_eq`/`#viz_cap`, and `render_bar` (the bar head creeps between mpv's per-second updates). `put` skips identical text and the layout pass |
+| animate | `YtmApp.animate` | 1/12 s | started and stopped by `animate_when_needed` (from `apply_layout`, pause/time-pos, `app_focus`): runs only while playing with something animated on screen; 1 s for `motion=low` or a blurred terminal, none for `off` (one still frame instead). Advances `_phase` by elapsed time, draws `#motif`, `#eq` (stage) and `#viz_eq` with `pixel.Bars`, `#viz_cap`, `#mini_sprite` (`pixel.sprite`, popped mini mode on a window ≥ 8 rows), `draw_art` (the scene while `scene_shown`, at most 4 frames a second) and `render_bar` (the bar head creeps between mpv's per-second updates). `put` skips identical text and the layout pass |
 | backlog | the inner `backlog()` in `on_mount` | 30 s | when a song is playing, not paused, and no worker is running: a `backlog` thread worker runs `brain.measure_next`. The timer stops when it returns `False` (nothing left) |
 | mpv events | `Player._event_loop` (daemon thread) | per property change | `on_change(name, value)` = `YtmApp._from_mpv` |
 
@@ -87,7 +87,8 @@ song_changed
 ├─ log "skip" (ended > 15 s before the end) or "finish" for the previous _played
 ├─ log "play", _songs_since += 1
 └─ think(vid, next_vid)                  brain worker (section 4)
-update_art → load_art(vid)               art worker: art.fetch → #art
+update_art → draw_art(), load_art(vid, w, h)   the scene at once; art worker: art.fetch → show_cover → #art
+                                         no song (queue ended): _cover = False, the scene again
 maybe_autofill → autofill(seed, ids)     when on one of the last 2 songs: autoplay worker
 ```
 
@@ -290,7 +291,7 @@ Coupling points the widget refactor has to handle:
 
 - points `Library.__init__`'s default path, `library.HISTORY` and `Settings.__init__`'s default path at a fresh temp folder, which it deletes afterwards. `"library": "copy"` copies `~/.ytmdev/data/ytm.db` in first.
 - replaces `ytm.app.Player` with `FakePlayer`, which has the same methods but plays nothing. It calls `app._apply` synchronously on the UI thread (there's no event thread), and `playlist()` returns fake `watch?v=` URLs.
-- replaces `art.fetch` with `fake_art` (a coloured block) and `search.search`/`search.radio` with the scenario's `results`.
+- replaces `art.fetch` with `fake_art` (a ▓ block) for songs with `art: true` and with None (no cover: the scene shows) for the rest, and `search.search`/`search.radio` with the scenario's `results`.
 - replaces `brain.think` with `fake_think`, which returns the scenario's `feats` plus its theme name. It also sets `brain.enabled = True` and makes `brain._post` raise, so any real Jev or LLM call fails loudly. `brain.budget`, `with_look` and `context` run for real against the temp library.
 - runs the `steps`: typed lines, keys, resizes, `mpv` property events, clicks and waits. It then checks `expect`/`absent` against the screen text from `screen_text` (the compositor) and writes `OUT/<name>.txt`, plus `.svg` with `--svg`.
 
