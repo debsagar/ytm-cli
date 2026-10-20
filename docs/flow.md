@@ -144,7 +144,9 @@ Typed input: `YtmApp.run_command` (`@on(Input.Submitted, "#prompt")`) splits the
 | `skip/next/n`, `prev/back`, `pause/p`, `vol N`, `remove N`/`rm N`, `clear` | `Player` methods directly |
 | `set …`, `mode …` | `change_setting` → `Settings.set` (or the settings popup, a `HelpScreen`) |
 | `cost` | `cost_report` |
-| `layout` | `choose_layout` → a `LayoutPicker` popup that previews each layout; Enter → `pick_layout(name)` |
+| `layout` | `choose_layout` → `open_picker` → a `Picker` popup that previews each layout; Enter → `pick_layout(name)` |
+| `theme`, `themes` | `theme_command` → `choose_theme` → `open_picker`; Enter → `pick_theme(name)`. While a picker is open `_held` keeps the look Esc goes back to, and `restyle` updates it instead of the screen |
+| `theme <name>` | `theme_command`: exact (any case) → `pick_theme`; close → did-you-mean; otherwise a search |
 | `layout <name>`, `vibe [name]` | `pick_layout`, `set_vibe` |
 | `pin <panel>`, `unpin <panel>` (one word only: "pin drop sound" searches) | `pin` → `change_setting("set", "pinned [...]")`, which reruns `apply_layout` for `pinned` |
 | `help`, `?` | `action_help` |
@@ -172,7 +174,7 @@ Keys: `YtmApp.BINDINGS` → `action_*`:
 
 So one action can have up to three entry points that each call `Player` themselves. Pause, for example, is the `pause` command, the `pause` button and `ctrl+space`. `action_row` is the only shared handler.
 
-Popups: `HelpScreen` (help and settings) and `PlaylistPicker`. The picker comes from `add_to_playlist` and dismisses with a playlist name or `None`, which goes to its `done` callback.
+Popups: `HelpScreen` (help and settings), `Picker` (layouts and themes) and `PlaylistPicker`. The picker comes from `add_to_playlist` and dismisses with a playlist name or `None`, which goes to its `done` callback.
 
 ## 6. The brain and the LLM path
 
