@@ -114,6 +114,7 @@ Sources: git history, CHANGELOG, README, `dev/README.md`, `docs/context.md`, the
 | D65 | 2026-10-19 | model | Build order: widgets as pieces → layouts as text maps → playground → extra widgets and a braille visualizer → yolo widgets | Each step builds on the one before | proposed |
 | D66 | 2026-10-19 | model | Layouts as text maps (`map = """…"""`, `.` = empty) converted into a Textual grid (`grid-size` + spans); user layouts in `~/.config/ytm/layouts/`; the playground built inside the app as `layout edit`, keyboard first, previewing at 74×24 and full size | Simpler than a split tree; text is diffable and easy for an LLM to write. Note: an earlier claim that Textual has `grid-template-areas` was false (it has none); see Priors | proposed |
 | D67 | 2026-10-19 | model | Visualizer: braille instead of block bars | The user dislikes blockiness (D58) | proposed |
+| D84 | 2026-10-20 | model | A small window hides whole panels in a fixed order (viz, then library, then player; the prompt never), and `pin <panel>` / the `pinned` setting keeps chosen ones, in any layout. Display only, never a remount; the dashboard still falls back to classic below 100x30 | The user asked to "pin the widgets that are important, or that the user sets" when resizing; hiding beats squashing every panel to a sliver (D61, D62), and pinning a panel into a layout that omits it was one CSS display toggle, so it's in | active |
 
 ## Testing
 

@@ -1,0 +1,412 @@
+[
+ {
+  "name": "pin-shrink-hides-viz-then-library",
+  "why": "Shrinking the dashboard to 60x16 used to fall back to classic and squash every panel into its window. Now unpinned panels hide, least important first: viz goes (classic has none), then the library, and the prompt stays.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   140,
+   40
+  ],
+  "steps": [
+   "layout dashboard",
+   {
+    "resize": [
+     60,
+     16
+    ]
+   }
+  ],
+  "expect": [
+   "search a song"
+  ],
+  "absent": [
+   "Traceback",
+   "visualizer",
+   "─ library"
+  ]
+ },
+ {
+  "name": "pin-shrink-40x12-keeps-prompt",
+  "why": "At 40x11 even the player doesn't fit: it hides too, and the ask panel (the only way to type a command) never does.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   140,
+   40
+  ],
+  "steps": [
+   "layout dashboard",
+   {
+    "resize": [
+     60,
+     18
+    ]
+   },
+   {
+    "resize": [
+     40,
+     11
+    ]
+   }
+  ],
+  "expect": [
+   "─ ask",
+   "search a song"
+  ],
+  "absent": [
+   "Traceback",
+   "─ now playing",
+   "─ library",
+   "visualizer"
+  ]
+ },
+ {
+  "name": "pin-grow-restores-panels",
+  "why": "Growing the window back shows every panel again: hiding only sets display, nothing is remounted.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   140,
+   40
+  ],
+  "steps": [
+   "layout dashboard",
+   {
+    "resize": [
+     60,
+     18
+    ]
+   },
+   {
+    "resize": [
+     40,
+     11
+    ]
+   },
+   {
+    "resize": [
+     140,
+     40
+    ]
+   }
+  ],
+  "expect": [
+   "─ now playing",
+   "─ library",
+   "─ ask",
+   "visualizer"
+  ],
+  "absent": [
+   "Traceback"
+  ]
+ },
+ {
+  "name": "pin-note-says-how-to-keep-it",
+  "why": "The first time panels hide, one note says which and how to keep them ('player · library hidden, window too small · pin player to keep it', cut at 40 cells).",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   74,
+   24
+  ],
+  "steps": [
+   {
+    "resize": [
+     40,
+     11
+    ]
+   },
+   {
+    "wait": 5.5
+   }
+  ],
+  "expect": [
+   "player · library hidden"
+  ],
+  "absent": [
+   "Traceback"
+  ]
+ },
+ {
+  "name": "pin-viz-survives-shrink",
+  "why": "A pinned panel stays when the window shrinks; unpinned ones (the player, then the library) give their room up first.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   140,
+   40
+  ],
+  "steps": [
+   "layout dashboard",
+   "pin viz",
+   {
+    "resize": [
+     60,
+     18
+    ]
+   }
+  ],
+  "expect": [
+   "visualizer",
+   "search a song"
+  ],
+  "absent": [
+   "Traceback",
+   "─ library"
+  ]
+ },
+ {
+  "name": "pin-viz-shows-in-classic",
+  "why": "Pinning viz shows it even in a layout that has none.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   74,
+   24
+  ],
+  "steps": [
+   "layout classic",
+   "pin viz"
+  ],
+  "expect": [
+   "visualizer",
+   "set pinned = [\"viz\"]"
+  ],
+  "absent": [
+   "Traceback"
+  ]
+ },
+ {
+  "name": "unpin-viz-hides-it-again",
+  "why": "`unpin viz` takes it out of the setting and the layout drops it again.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   74,
+   24
+  ],
+  "steps": [
+   "layout classic",
+   "pin viz",
+   "unpin viz"
+  ],
+  "expect": [
+   "set pinned = []"
+  ],
+  "absent": [
+   "Traceback",
+   "visualizer"
+  ]
+ },
+ {
+  "name": "set-pinned-applies-now",
+  "why": "`set pinned viz` (the setting itself, not the command) took effect only on the next resize.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   74,
+   24
+  ],
+  "steps": [
+   "layout classic",
+   "set pinned viz"
+  ],
+  "expect": [
+   "visualizer"
+  ],
+  "absent": [
+   "Traceback"
+  ]
+ },
+ {
+  "name": "pin-bad-panel-name",
+  "why": "A typo names the panels instead of pinning nothing or failing silently.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   74,
+   24
+  ],
+  "steps": [
+   "pin vizz"
+  ],
+  "expect": [
+   "no panel vizz",
+   "pin player · library · viz"
+  ],
+  "absent": [
+   "Traceback"
+  ]
+ },
+ {
+  "name": "set-pinned-bad-name",
+  "why": "The setting validates panel names too.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   74,
+   24
+  ],
+  "steps": [
+   "set pinned foo"
+  ],
+  "expect": [
+   "pinned: pick from"
+  ],
+  "absent": [
+   "Traceback"
+  ]
+ },
+ {
+  "name": "song-pin-drop-sound",
+  "why": "`pin` is a command only with one word: 'pin drop sound' is a song search.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   74,
+   24
+  ],
+  "steps": [
+   "pin drop sound"
+  ],
+  "expect": [
+   "Pin Drop Sound"
+  ],
+  "absent": [
+   "Traceback",
+   "no panel"
+  ],
+  "results": [
+   {
+    "id": "bbbbbbbbbbb",
+    "title": "Pin Drop Sound",
+    "artist": "B"
+   }
+  ]
+ },
+ {
+  "name": "pin-resize-with-help-open",
+  "why": "Resizing while a popup is open still fits the panels on the player screen underneath, and closing it shows them.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   140,
+   40
+  ],
+  "steps": [
+   "layout dashboard",
+   "?",
+   {
+    "resize": [
+     40,
+     11
+    ]
+   },
+   {
+    "key": "escape"
+   },
+   {
+    "resize": [
+     140,
+     40
+    ]
+   }
+  ],
+  "expect": [
+   "─ now playing",
+   "─ library",
+   "visualizer"
+  ],
+  "absent": [
+   "Traceback",
+   "Type anything"
+  ]
+ },
+ {
+  "name": "pin-viz-stays-above-prompt",
+  "why": "A pinned viz in classic drew below the ask panel: the prompt must stay the last panel, right above the footer, in every layout but the dashboard (where ask is top right). The expected text is the prompt line, ask's bottom border, then the footer.",
+  "songs": [
+   {
+    "id": "aaaaaaaaaaa",
+    "title": "One",
+    "artist": "A"
+   }
+  ],
+  "size": [
+   74,
+   24
+  ],
+  "steps": [
+   "layout classic",
+   "pin viz"
+  ],
+  "expect": [
+   "visualizer",
+   "for help                                    │ \n ╰──────────────────────────────────────────────────────────────────────╯ \n  enter search"
+  ],
+  "absent": [
+   "Traceback"
+  ]
+ }
+]

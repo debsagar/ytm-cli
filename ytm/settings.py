@@ -28,6 +28,8 @@ SPEC = {
     "grow_themes": ("auto", ["auto", "never"], "let the LLM write new themes for new kinds of songs"),
     "llm_model": ("anthropic/claude-haiku-5.5", MODEL_ID, "OpenRouter model that writes themes, e.g. google/gemini-2.5-flash-lite"),
     "max_new_themes_week": (3, int, "cap on LLM-written themes per 7 days"),
+    "pinned": ([], ["player", "library", "ask", "viz"],
+               "panels kept on a small window, in any layout · the rest hide viz, library, player"),
 }
 
 

@@ -146,6 +146,7 @@ Typed input: `YtmApp.run_command` (`@on(Input.Submitted, "#prompt")`) splits the
 | `cost` | `cost_report` |
 | `layout` | `choose_layout` → a `LayoutPicker` popup that previews each layout; Enter → `pick_layout(name)` |
 | `layout <name>`, `vibe [name]` | `pick_layout`, `set_vibe` |
+| `pin <panel>`, `unpin <panel>` (one word only: "pin drop sound" searches) | `pin` → `change_setting("set", "pinned [...]")`, which reruns `apply_layout` for `pinned` |
 | `help`, `?` | `action_help` |
 | a bare URL | `Player.play` |
 | anything else | `do_search(line, "search")` |
@@ -257,12 +258,13 @@ Screen                           classes: layout-<name>, tight, tall
 │  │     └─ ListView#list       Row | PlaylistRow | a placeholder ListItem
 │  └─ Vertical#right
 │     ├─ Vertical#ask.panel              "ask":  Static#log (dashboard only), Static#msg, Input#prompt
-│     └─ Vertical#viz.panel              "visualizer" (dashboard only): Static#viz_eq, Static#viz_cap
+│     └─ Vertical#viz.panel              "visualizer" (dashboard, or pinned): Static#viz_eq, Static#viz_cap
 └─ Static#footer
 ```
 
 How layouts are applied today: all styling is one `YtmApp.CSS` string keyed on classes of the main screen (`YtmApp.main` = `screen_stack[0]`, so popups don't hide it).
-- `apply_layout` picks `apply_vibe(theme_spec, vibe)["layout"]`, or `classic` if `fits()` fails (the dashboard needs `DASH_MIN` = 100x30). It sets one `layout-<name>` class and `tight` (height < 28), updates the `#layout` tooltip, then calls `fit_art`.
+- `apply_layout` picks `apply_vibe(theme_spec, vibe)["layout"]`, or `classic` if `fits()` fails (the dashboard needs `DASH_MIN` = 100x30). It sets one `layout-<name>` class and `tight` (height < 28), updates the `#layout` tooltip, then calls `fit_art` and `fit_panels`.
+- `fit_panels` shows the layout's panels plus `settings["pinned"]`, then hides unpinned ones from the end of `PANELS` (viz, library, player; never ask) until the rest fit the height, estimated from `PANEL_H` and the art. Outside the dashboard it moves `#viz` above `#ask` (`move_child`, a reorder, not a remount) so the prompt stays the last panel above the footer. It writes `.display` only and notes newly hidden panels once a session (`_noted`). The dashboard is skipped: it only shows at `DASH_MIN`, where all four fit. `#viz` is `display: none` in CSS and only `fit_panels` shows it; the tick draws `#viz_eq` whenever `#viz` is shown.
 - `fit_art` sets `tall` (≥ 100x40: hero art doubles to 40x20) and writes `#art.styles.display` inline. Art shows only at ≥ 70x26 and never in focus. When `tall` flips in hero, `fit_art` resets `_art_id` so the art is fetched again at the new size, and `apply_layout` does the same on a layout change.
 - Both run on resize, on theme change and on every tick. The size can arrive a moment after the resize event.
 - Colours: `C` is a module-level dict. `get_css_variables` exposes it as `$ytm-*`, and `apply_theme` overwrites it from `theme.colors` before `refresh_css`.

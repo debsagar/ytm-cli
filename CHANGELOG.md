@@ -6,6 +6,7 @@ All notable changes to this project are documented here. Versions follow [Semant
 
 ### Added
 - `layout` opens a layout picker: each layout with its description, the current one marked, ones too big for the window dimmed; moving the highlight previews it, Enter keeps it, Esc puts yours back. ▦ still cycles.
+- A small window hides panels instead of squashing them: the visualizer first, then the library, then the player; the prompt never hides. `pin viz` / `unpin viz` (or `set pinned viz library`) keep a panel on a small window and show it in any layout, even classic. Panels come back when the window grows.
 
 ### Fixed
 - A search that starts with a command word ("quit playing games", "save your tears", "p diddy") searches instead of running the command.

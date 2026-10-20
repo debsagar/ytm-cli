@@ -37,6 +37,8 @@ NOISE_RE = re.compile(
 TABS = ["queue", "history", "liked", "playlists", "results"]
 ART_W, ART_H = 20, 10  # cells; the image is 20x20 pixels
 DASH_MIN = (100, 30)  # the dashboard layout needs this many cells; smaller windows show classic
+PANELS = ("ask", "player", "library", "viz")  # most important first: a small window hides from the end; ask never
+PANEL_H = {"ask": 4, "player": 7, "library": 5, "viz": 5}  # rows each needs stacked (borders included, tight)
 
 HELP_ROWS = [
     ("Type anything", "search YouTube Music"),
@@ -53,6 +55,7 @@ HELP_ROWS = [
     ("mode off · jev · yolo", "how much the brain may do"),
     ("layout · layout <name>", "pick one with a preview · ▦ cycles"),
     ("vibe · vibe calm|normal|loud", "calm: less decoration, loud: more"),
+    ("pin viz · unpin viz", "keep a panel on a small window"),
     ("quit", "exit (Ctrl+Q also works)"),
     ("", ""),
     ("Mouse", "every button and tab is clickable"),
@@ -121,6 +124,8 @@ def is_command(cmd, arg):
         return not arg
     if cmd in ("auto", "autoplay"):
         return not arg or arg.lower() in ON | OFF
+    if cmd in ("pin", "unpin"):  # "pin viz" is a command, "pin drop sound" a song
+        return " " not in arg
     if cmd == "set":  # "set max themes 20" is a (mistyped) setting, "set fire to the rain" a song
         return not arg or settings._closest(re.split(r"[\s=]", arg)[0], "") is not None
     return True
@@ -334,7 +339,7 @@ class YtmApp(App):
     #library:focus-within {{ border: round $ytm-green; }}
     #ask {{ border-title-color: $ytm-blue; }}
     #ask:focus-within {{ border: round $ytm-blue; }}
-    #viz {{ display: none; height: 1fr; border-title-color: $ytm-mauve; }}
+    #viz {{ display: none; height: {PANEL_H["viz"]}; border-title-color: $ytm-mauve; }}  /* fit_panels shows it */
     #log {{ display: none; color: $ytm-dim; content-align: left bottom; text-wrap: nowrap; text-overflow: ellipsis; }}
 
     #now {{ height: auto; }}
@@ -346,7 +351,7 @@ class YtmApp(App):
     Screen.layout-stage #eq {{ display: block; }}
     Screen.layout-hero.tall #art {{ width: {ART_W * 2}; height: {ART_H * 2}; margin-right: 3; }}
     Screen.layout-hero #title {{ margin-top: 1; }}
-    Screen.layout-focus #art, Screen.layout-focus #library {{ display: none; }}
+    Screen.layout-focus #art {{ display: none; }}
     Screen.layout-focus #player {{ height: 1fr; margin: 0 1; }}
     Screen.layout-focus #now {{ height: 1fr; align: center middle; }}
     Screen.layout-focus #info {{ width: 80%; }}
@@ -363,7 +368,7 @@ class YtmApp(App):
     Screen.layout-dashboard #controls {{ dock: bottom; }}
     Screen.layout-dashboard #ask {{ border-title-color: $ytm-pink; }}
     Screen.layout-dashboard #ask:focus-within {{ border: round $ytm-pink; }}
-    Screen.layout-dashboard #viz {{ display: block; }}
+    Screen.layout-dashboard #viz {{ height: 1fr; }}
     Screen.layout-dashboard #log {{ display: block; height: 1fr; }}
     Screen.layout-dashboard #msg {{ height: auto; text-wrap: wrap; }}  /* the ask panel is narrow: wrap, the log above shrinks */
     Screen.layout-dashboard #motif {{ display: none; }}
@@ -455,6 +460,7 @@ class YtmApp(App):
         self.song_feats = {}       # features of the song playing (headline, blurb...)
         self._played = None        # (video id, last position, duration) for skip logging
         self._unplayed = None      # a song loaded paused (resume): not a play until it plays
+        self._noted = set()        # panels whose "hidden, window too small" note was shown
         self._picked = set()       # parts of the look the user picked (layout, colours): restyles keep them
         self.layout = "classic"     # the layout on screen (the theme's, if the window fits it)
         self._log = []              # recent messages, shown in the dashboard's ask panel
@@ -651,6 +657,47 @@ class YtmApp(App):
         if self.query_one("#layout").tooltip != tip:
             self.query_one("#layout").tooltip = tip
         self.fit_art()
+        self.fit_panels(want)  # after fit_art: the player's height depends on the art
+
+    def fit_panels(self, want):
+        """Show the layout's panels plus the pinned ones, then hide unpinned ones, least important
+        first, until the rest fit the window's height. Sets display only: nothing is remounted."""
+        def panels(lay):
+            return {"ask", "player"} | ({"library"} if lay != "focus" else set()) | ({"viz"} if lay == "dashboard" else set())
+        pinned = set(self.settings["pinned"]) | {"ask"}
+        shown = panels(self.layout) | pinned
+        if self.layout != "dashboard":  # the dashboard only shows at DASH_MIN, where all four fit
+            tight = self.size.height < 28
+            gaps = 0 if tight else 4  # not tight: margins between panels
+            big = self.layout == "hero" and self.main.has_class("tall")
+            art = 0 if self.query_one("#art").styles.display == "none" else ART_H * (2 if big else 1)
+            info = PANEL_H["player"] + 3 * (self.layout == "stage") + (self.layout == "hero") + 2 * (not tight)  # eq, title gap, bar gaps
+            h = dict(PANEL_H, player=max(info, art + 2))
+            for p in reversed(PANELS):
+                need = 1 + gaps + sum(h[x] for x in shown)
+                if need <= self.size.height:
+                    break
+                if p not in pinned:
+                    shown.discard(p)
+        right = self.query_one("#right")
+        if (right.children[0].id == "ask") != (self.layout == "dashboard"):  # the prompt stays last, above the footer, outside the dashboard
+            right.move_child(right.children[1], before=0)  # a reorder, not a remount
+        for p in PANELS:
+            if self.query_one(f"#{p}").display != (p in shown):
+                self.query_one(f"#{p}").display = p in shown
+        if new := [p for p in PANELS if p in panels(want) - shown - self._noted]:  # once a session per panel
+            self._noted |= set(new)
+            self.say(f"{' · '.join(new)} hidden, window too small · pin {new[0]} to keep it", True)
+
+    def pin(self, name, on):
+        """`pin viz` keeps a panel on a small window and in every layout; `unpin viz` lets it hide."""
+        if name not in PANELS:
+            now = " · ".join(self.settings["pinned"]) or "nothing"
+            self.say((f"no panel {escape(name)} · " if name else f"pinned: {now} · ")
+                     + "pin player · library · viz · a small window hides viz, then library, then player")
+            return
+        want = [p for p in self.settings["pinned"] if p != name] + [name] * on
+        self.change_setting("set", "pinned [" + ", ".join(f'"{p}"' for p in want) + "]")
 
     def pick_layout(self, name=None):
         """Instant control: the next layout that fits (name=None), or a named one.
@@ -814,7 +861,7 @@ class YtmApp(App):
         if self.layout == "stage":
             energy = self.song_feats.get("energy", 0.5)
             self.query_one("#eq").update(theme.equaliser(width, 3, self._phase, energy))
-        if self.layout == "dashboard":
+        if self.query_one("#viz").display:
             eq, f = self.query_one("#viz_eq"), self.song_feats
             energy = f.get("energy", 0.5)
             eq.update(theme.equaliser(eq.content_size.width, max(1, eq.content_size.height), self._phase, energy))
@@ -953,6 +1000,8 @@ class YtmApp(App):
             self.say(escape(str(e)))
             return
         self.lib.log("setting", "", key=key, to=v)
+        if key == "pinned":
+            self.apply_layout()
         self.say(f"set {escape(key)} = {escape(settings._toml(v))}")  # no ⚙: Windows Terminal draws it 2 cells wide
         self.render_footer()
 
@@ -1103,12 +1152,16 @@ class YtmApp(App):
 
     def show_results(self):
         self.show("results")
-        if not self.query_one("#library").display:  # the focus layout hides the list: never focus it hidden
+        lib = self.query_one("#library")
+        if not lib.display and self.layout == "focus":  # the focus layout hides the list: never focus it hidden
             self.pick_layout("classic")
             self.say("▦ classic, to show results")
         else:
             self.say("")
-        self.call_after_refresh(self.query_one("#list").focus)
+        if lib.display:
+            self.call_after_refresh(self.query_one("#list").focus)
+        else:  # hidden by a small window
+            self.say("results are in the library · it's hidden, window too small · pin library to keep it")
 
     # ---- likes & playlists ----
     def like(self, t: Track):
@@ -1199,6 +1252,8 @@ class YtmApp(App):
                 self.cost_report()
             elif cmd == "layout":
                 self.pick_layout(arg.lower()) if arg else self.choose_layout()
+            elif cmd in ("pin", "unpin"):
+                self.pin(arg.lower(), cmd == "pin")
             elif cmd == "vibe":
                 self.set_vibe(arg.lower() or None)
             elif cmd in ("help", "?"):
