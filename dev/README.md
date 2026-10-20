@@ -5,6 +5,7 @@ There are no hand-written test lists here. Each round, someone (usually an LLM a
 ```powershell
 uv run python dev/try.py dev/breaks/*.json     # replay every known break
 uv run python dev/try.py my_idea.json --svg    # try a new idea; screens go to %TEMP%\ytm-try
+uv run python dev/palette_check.py              # theme colour rules and brain.motion, pure code
 ```
 
 `try.py` renders the real UI with a fake player: no mpv, no network and no API spend. The scenario format is described at the top of the file.

@@ -9,6 +9,11 @@ All notable changes to this project are documented here. Versions follow [Semant
 - A small window hides panels instead of squashing them: the visualizer first, then the library, then the player; the prompt never hides. `pin viz` / `unpin viz` (or `set pinned viz library`) keep a panel on a small window and show it in any layout, even classic. Panels come back when the window grows.
 - `theme` (or `themes`) opens a theme picker: every theme with a colour swatch, its motif and layout; moving the highlight previews it, Enter keeps it like ◐, Esc puts yours back. `theme <name>` picks one directly and suggests the closest name for a typo.
 
+- Jev also measures each new song's pace, brightness and texture (acoustic ↔ electronic); `brain.motion(f)` hands them to the look and the animation, with guesses for songs measured before.
+
+### Changed
+- Grown themes look like they belong with the presets: the theme writer gets a short design system and the song group's pace, brightness and texture, and every theme's colours are nudged to a readable, calm palette (dark bg, text 7:1, accents 3:1, no clashing or neon accent2). Preset colours stay as they were.
+
 ### Fixed
 - A search that starts with a command word ("quit playing games", "save your tears", "p diddy") searches instead of running the command.
 - `set`: suggests the right key for a wrong one, accepts `key = value`, quotes, lists and any case, and never overwrites a `settings.toml` that has a syntax error. Bad values in the file are reported per key instead of silently ignored.

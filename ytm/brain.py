@@ -83,6 +83,16 @@ MOODS = {
     "dreamy": "hazy, floaty, psychedelic", "aggressive": "hard, confrontational, hype",
     "nostalgic": "retro, throwback, wistful", "euphoric": "uplifting, rave, hands-in-the-air",
 }
+# Look and motion only, never vec(): cached centres and grown themes keep their dimensions.
+# Each is a 0..1 score; motion() fills them in for songs measured before they existed.
+LOOK = {
+    "pace": ("How fast does `song` feel?",           # animation speed (feat/motion)
+             ["beatless or very slow", "slow to mid tempo", "brisk, steady beat", "fast, driving"]),
+    "bright": ("How bright does `song` sound?",       # palette: deep and cool vs warm and clear
+               ["dark, heavy or sad", "bittersweet or neutral", "bright, warm, joyful"]),
+    "texture": ("How electronic is `song`?",          # palette and motif: earthy vs neon
+                ["acoustic, organic", "band with production", "electronic, synthetic"]),
+}
 TAGS = {
     "soundtrack": "Is `song` from a film, TV show or video game soundtrack?",
     "motorsport": "Is `song` connected to racing or motorsport (F1, cars, speed)?",
@@ -96,6 +106,7 @@ def judge(song, lib=None, video_id=""):
         "energy": {"type": "score", "criteria": ENERGY, "instructions": "How energetic is `song`?"},
         "mood": {"type": "choice", "criteria": MOODS, "instructions": "What is the dominant mood of `song`?"},
         **{k: {"type": "noul", "instructions": q} for k, q in TAGS.items()},
+        **{k: {"type": "score", "criteria": c, "instructions": q} for k, (q, c) in LOOK.items()},
     }
     r = _post(JEV_URL, _key("TYPESAFE_API_KEY"), {"model": "jev-latest", "state": {"song": song},
                                                   "questions": questions})
@@ -108,8 +119,19 @@ def judge(song, lib=None, video_id=""):
         "mood": a["mood"]["choice"], "mood_p": a["mood"]["probabilities"],
         "tag_p": {k: a[k]["noul"] for k in TAGS},
         "tags": [k for k in TAGS if a[k]["noul"] >= 0.6],
+        **{k: round(a[k]["score"] / (len(c) - 1), 2) for k, (_, c) in LOOK.items()},
         "model": r["model"],
     }
+
+
+def motion(f):
+    """{energy, pace, bright, texture}, each 0..1, for the look and the animation. Songs measured
+    before pace/bright/texture existed get guesses from what they have, so nothing is re-judged."""
+    e, m, t = f.get("energy", 0.5), f.get("mood_p") or {}, f.get("tag_p") or {}
+    lift = m.get("happy", 0) + m.get("euphoric", 0) + m.get("romantic", 0) / 2
+    sink = m.get("dark", 0) + m.get("melancholic", 0) + m.get("aggressive", 0) / 2
+    guess = {"pace": e, "bright": 0.5 + (lift - sink) / 2, "texture": 0.3 + 0.6 * t.get("club", 0)}
+    return {"energy": e, **{k: round(min(1.0, max(0.0, f.get(k, g))), 2) for k, g in guess.items()}}
 
 
 # ---- clustering, all in code ----
@@ -142,22 +164,27 @@ def assign(f, themes):
 
 
 # ---- Haiku: style a new cluster from its member songs ----
-WRITER_PROMPT = """You design visual themes for a terminal music player.
-A group of songs doesn't fit any existing theme. Design ONE theme for songs like these.
-"measured" is how energetic/what mood they actually are; let it drive the look:
+WRITER_PROMPT = """You design one theme for a minimalist terminal music player.
+These songs share a sound no existing theme fits ("measured" is 0..1):
 {songs}
 Listener's taste: {profile}
-Existing themes (make something clearly different): {existing}
+Existing themes (pick a different hue, keep the same restraint): {existing}
 
-Return ONLY a JSON object:
-{{"name": "2-3 word theme name, lowercase",
-  "for": "one line: which kinds of songs this theme suits",
+Design system:
+- bg and panel: near-black, tinted with the accent's hue, panel a shade off bg.
+- accent: the ONE vivid colour. accent2: analogous or split-complementary to it, calmer.
+- text: near-white with a hint of the hue. dim: muted mid-tone, clearly darker than text.
+- From "measured": bright low = deep, cool, muted; high = warm, clear. texture low = earthy, soft;
+  high = neon, crisp. pace/energy high = more saturated accent, busier motif; low = "none" or sparse.
+- Minimal: one idea, nothing loud but the accent.
+
+Return ONLY JSON:
+{{"name": "2-3 words, lowercase", "for": "one line: which songs this suits",
   "palette": {{"bg": "#rrggbb", "panel": "#rrggbb", "accent": "#rrggbb", "accent2": "#rrggbb",
               "text": "#rrggbb", "dim": "#rrggbb"}},
   "motif": one of {motifs},
-  "progress": {{"style": one of {styles}, "cursor": "one character or emoji, or empty",
-               "label": "template using {{pos}} {{dur}} {{pct}} {{lap}} {{laps}}"}}}}
-Keep text readable: bg/panel dark, text light, accent vivid."""
+  "progress": {{"style": one of {styles}, "cursor": "one character or empty",
+               "label": "template using {{pos}} {{dur}} {{pct}} {{lap}} {{laps}}"}}}}"""
 
 
 def write_theme(songs, profile, existing, lib=None, model=None):
@@ -195,7 +222,7 @@ def grow(lib, themes):
         group = [(o, g) for o, g in outliers if math.dist(v, song_vec(g)) <= GROUP]
         if len(group) >= MIN_CLUSTER:
             songs = [s for s in (lib.song(o) for o, _ in group) if s]
-            measured = describe([song_vec(g) for _, g in group])
+            measured = describe([g for _, g in group])
             spec = write_theme({"songs": songs, "measured": measured}, context.slice_for("theme", lib, ids=[o for o, _ in group]),
                                  [t["name"] for t in themes], lib)
             if not spec or spec["name"] in {t["name"] for t in themes}:
@@ -227,12 +254,15 @@ def refine(lib, rounds=3):
     recluster(lib)
 
 
-def describe(vs):
-    """Readable profile of a group of song vectors, for the theme writer."""
+def describe(fs):
+    """Readable profile of a group of songs' features, for the theme writer. Numbers are 0..1."""
+    vs = [song_vec(f) for f in fs]
     mean = [sum(c) / len(vs) for c in zip(*vs)]
     moods = sorted(zip(MOODS, mean[1:1 + len(MOODS)]), key=lambda x: -x[1])[:3]
     tags = [t for t, p in zip(TAGS, mean[1 + len(MOODS):]) if p >= 0.5]
-    return {"energy_0_to_1": round(mean[0] / 2, 2), "top_moods": {m: round(p, 2) for m, p in moods}, "tags": tags}
+    look = [motion(f) for f in fs]
+    return {**{k: round(sum(m[k] for m in look) / len(look), 2) for k in ("energy", "pace", "bright", "texture")},
+            "top_moods": {m: round(p, 2) for m, p in moods}, "tags": tags}
 
 
 def think(song, lib, llm=True):

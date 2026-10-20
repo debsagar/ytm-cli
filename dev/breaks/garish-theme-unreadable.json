@@ -1,0 +1,40 @@
+[
+ {
+  "name": "garish-theme-unreadable",
+  "why": "The theme writer can return text barely lighter than bg, an accent that vanishes and a panel in another hue. normalize() used to keep it as written; now it nudges each colour until it reads (text 7:1, accents and dim 3:1 on bg) pulls the panel back next to bg, lifts the dull accent and calms the neon accent2 so it supports the accent instead of shouting over it.",
+  "songs": [{"id": "aaaaaaaaaaa", "title": "Midnight Bloom", "artist": "Neon Field"}],
+  "theme": {"name": "acid bloom", "for": "euphoric neon synth-pop", "motif": "stars",
+            "palette": {"bg": "#3b0a45", "panel": "#0a4b35", "accent": "#5a2a6a", "accent2": "#00ff00", "text": "#8a6a90", "dim": "#7a5a80"}},
+  "steps": ["theme acid bloom"],
+  "palette": {"bg": "#3b0a45", "panel": "#2f1a41", "accent": "#a55bbe", "accent2": "#34cb34", "text": "#bba7be", "dim": "#836089"},
+  "expect": ["acid bloom"],
+  "absent": ["Traceback"]
+ },
+ {
+  "name": "light-theme-goes-dark",
+  "why": "A pale theme (white text on light grey-blue) is darkened to the dark design system instead of rendering white on near-white.",
+  "songs": [{"id": "aaaaaaaaaaa", "title": "Midnight Bloom", "artist": "Neon Field"}],
+  "theme": {"name": "pale frost", "for": "icy ambient", "motif": "rain",
+            "palette": {"bg": "#c8d8e8", "panel": "#ffffff", "accent": "#e0f0ff", "accent2": "#ffcc00", "text": "#ffffff", "dim": "#dddddd"}},
+  "steps": ["theme pale frost"],
+  "palette": {"bg": "#202427", "text": "#ffffff"},
+  "absent": ["Traceback"]
+ },
+ {
+  "name": "clashing-accent2-snaps",
+  "why": "Pure red accent2 on an olive theme sits 78 degrees from the accent, in the clash zone between analogous and split-complementary: it snaps to 60 degrees (orange-red) and its chroma drops to near the accent's.",
+  "songs": [{"id": "aaaaaaaaaaa", "title": "Midnight Bloom", "artist": "Neon Field"}],
+  "theme": {"name": "swamp gold", "for": "murky southern rock", "motif": "leaves",
+            "palette": {"bg": "#2b3a10", "panel": "#5a2a10", "accent": "#4a5a20", "accent2": "#ff0000", "text": "#7a8a50", "dim": "#7a8a50"}},
+  "steps": ["theme swamp gold"],
+  "palette": {"accent": "#a5c356", "accent2": "#d05c2f", "panel": "#342a0d"},
+  "absent": ["Traceback"]
+ },
+ {
+  "name": "preset-palette-untouched",
+  "why": "The presets already follow the design rules, so normalize leaves their colours exactly as written.",
+  "songs": [{"id": "aaaaaaaaaaa", "title": "One", "artist": "A"}],
+  "steps": ["theme dark techno"],
+  "palette": {"bg": "#0a0a0a", "panel": "#050505", "accent": "#e0e0e0", "accent2": "#ff1f3d", "text": "#d8d8d8", "dim": "#5d5d5d"}
+ }
+]
